@@ -28,9 +28,9 @@ export class UserEntity implements User {
     return new UserEntity(
       json.id,
       json.email,
-      json.name || json.firstName + ' ' + json.lastName,
+      json.name || (json.firstName && json.lastName ? `${json.firstName} ${json.lastName}` : json.email),
       json.role,
-      new Date(json.createdAt),
+      json.createdAt ? new Date(json.createdAt) : new Date(),
     );
   }
 
