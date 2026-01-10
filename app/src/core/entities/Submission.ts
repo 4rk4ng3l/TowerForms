@@ -92,6 +92,25 @@ export class SubmissionEntity implements Submission {
     );
   }
 
+  updateMetadata(newMetadata: Partial<SubmissionMetadata>): SubmissionEntity {
+    const updatedMetadata: SubmissionMetadata = {
+      ...this.metadata,
+      ...newMetadata,
+    };
+
+    return new SubmissionEntity(
+      this.id,
+      this.formId,
+      this.userId,
+      this.answers,
+      updatedMetadata,
+      this.status,
+      this.createdAt,
+      new Date(), // Update timestamp
+      this.syncedAt,
+    );
+  }
+
   complete(): SubmissionEntity {
     if (this.status === 'completed' || this.status === 'synced') {
       return this;

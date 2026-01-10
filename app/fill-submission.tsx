@@ -9,9 +9,11 @@ import {
   TextInput,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 import {useLocalSearchParams, useRouter, Stack} from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {useSubmissionsStore} from '@store/submissions/submissionsStore';
 import {useFormsStore} from '@store/forms/formsStore';
 import {useFilesStore} from '@store/files/filesStore';
@@ -21,14 +23,17 @@ import {SubmissionEntity, Answer} from '@core/entities/Submission';
 export default function FillSubmissionScreen() {
   const {submissionId} = useLocalSearchParams<{submissionId: string}>();
   const router = useRouter();
-  const {currentSubmission, loadSubmission, updateAnswer, completeSubmission} =
+  const {currentSubmission, loadSubmission, updateAnswer, updateMetadata, completeSubmission} =
     useSubmissionsStore();
   const {getFormById} = useFormsStore();
   const {addFile, loadFilesForQuestion, deleteFile, files} = useFilesStore();
   const [form, setForm] = useState<Form | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [currentStepIndex, setCurrentStepIndex] = useState(-1); // -1 = metadata screen
   const [answers, setAnswers] = useState<{[questionId: string]: any}>({});
+  const [metadataValues, setMetadataValues] = useState<{[key: string]: any}>({});
+  const [showDatePicker, setShowDatePicker] = useState<string | null>(null);
+  const [showTimePicker, setShowTimePicker] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -43,6 +48,8 @@ export default function FillSubmissionScreen() {
 
       if (currentSubmission) {
         const loadedForm = await getFormById(currentSubmission.formId);
+        console.log('[FillSubmission] Form loaded:', loadedForm?.name);
+        console.log('[FillSubmission] Form metadataSchema:', loadedForm?.metadataSchema);
         setForm(loadedForm);
 
         // Load existing answers
@@ -51,6 +58,10 @@ export default function FillSubmissionScreen() {
           existingAnswers[answer.questionId] = answer.value;
         });
         setAnswers(existingAnswers);
+
+        // Load existing metadata
+        const existingMetadata = {...currentSubmission.metadata};
+        setMetadataValues(existingMetadata);
 
         // Load files for file_upload questions
         if (loadedForm) {
@@ -95,8 +106,50 @@ export default function FillSubmissionScreen() {
     }
   };
 
+  const validateMetadata = (): boolean => {
+    if (!form || !form.metadataSchema) return true;
+
+    const schema = form.metadataSchema;
+    for (const [key, field] of Object.entries(schema)) {
+      if (field.required && !metadataValues[key]) {
+        Alert.alert('Error', `El campo "${field.label}" es requerido`);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const handleMetadataChange = (key: string, value: any) => {
+    setMetadataValues(prev => ({
+      ...prev,
+      [key]: value,
+    }));
+  };
+
+  const saveMetadata = async () => {
+    if (!currentSubmission) return;
+
+    try {
+      // Update submission with metadata
+      await updateMetadata(currentSubmission.id, metadataValues);
+      console.log('Metadata saved:', metadataValues);
+    } catch (error) {
+      console.error('Error saving metadata:', error);
+      Alert.alert('Error', 'No se pudo guardar los metadatos');
+      throw error;
+    }
+  };
+
   const handleNext = async () => {
     if (!form) return;
+
+    // If on metadata screen, validate and save metadata
+    if (currentStepIndex === -1) {
+      if (!validateMetadata()) return;
+      await saveMetadata();
+      setCurrentStepIndex(0);
+      return;
+    }
 
     // Save all answers for current step
     const currentStep = form.steps[currentStepIndex];
@@ -132,7 +185,7 @@ export default function FillSubmissionScreen() {
   };
 
   const handlePrevious = () => {
-    if (currentStepIndex > 0) {
+    if (currentStepIndex > -1) {
       setCurrentStepIndex(currentStepIndex - 1);
     }
   };
@@ -251,6 +304,127 @@ export default function FillSubmissionScreen() {
         },
       ],
     );
+  };
+
+  const renderMetadataField = (key: string, field: any) => {
+    const value = metadataValues[key];
+
+    switch (field.type) {
+      case 'text':
+        return (
+          <View key={key} style={styles.questionContainer}>
+            <Text style={styles.questionText}>
+              {field.label}
+              {field.required && <Text style={styles.required}> *</Text>}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={value || ''}
+              onChangeText={text => handleMetadataChange(key, text)}
+              placeholder={`Ingrese ${field.label.toLowerCase()}`}
+            />
+          </View>
+        );
+
+      case 'date':
+        return (
+          <View key={key} style={styles.questionContainer}>
+            <Text style={styles.questionText}>
+              {field.label}
+              {field.required && <Text style={styles.required}> *</Text>}
+            </Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowDatePicker(key)}>
+              <Text style={styles.dateButtonText}>
+                {value
+                  ? new Date(value).toLocaleDateString('es-ES')
+                  : 'Seleccionar fecha'}
+              </Text>
+            </TouchableOpacity>
+            {showDatePicker === key && (
+              <DateTimePicker
+                value={value ? new Date(value) : new Date()}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(null);
+                  if (selectedDate) {
+                    handleMetadataChange(key, selectedDate.toISOString());
+                  }
+                }}
+              />
+            )}
+          </View>
+        );
+
+      case 'time':
+        return (
+          <View key={key} style={styles.questionContainer}>
+            <Text style={styles.questionText}>
+              {field.label}
+              {field.required && <Text style={styles.required}> *</Text>}
+            </Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowTimePicker(key)}>
+              <Text style={styles.dateButtonText}>
+                {value
+                  ? new Date(value).toLocaleTimeString('es-ES', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })
+                  : 'Seleccionar hora'}
+              </Text>
+            </TouchableOpacity>
+            {showTimePicker === key && (
+              <DateTimePicker
+                value={value ? new Date(value) : new Date()}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                onChange={(event, selectedTime) => {
+                  setShowTimePicker(null);
+                  if (selectedTime) {
+                    handleMetadataChange(key, selectedTime.toISOString());
+                  }
+                }}
+              />
+            )}
+          </View>
+        );
+
+      case 'select':
+        return (
+          <View key={key} style={styles.questionContainer}>
+            <Text style={styles.questionText}>
+              {field.label}
+              {field.required && <Text style={styles.required}> *</Text>}
+            </Text>
+            <View style={styles.optionsContainer}>
+              {field.options?.map((option: string, index: number) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.optionButton,
+                    value === option && styles.optionButtonSelected,
+                  ]}
+                  onPress={() => handleMetadataChange(key, option)}>
+                  <Text
+                    style={[
+                      styles.optionText,
+                      value === option && styles.optionTextSelected,
+                    ]}>
+                    {option}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        );
+
+      default:
+        return null;
+    }
   };
 
   const renderQuestion = (question: Question) => {
@@ -459,8 +633,21 @@ export default function FillSubmissionScreen() {
     );
   }
 
-  const currentStep = form.steps[currentStepIndex];
-  const progress = ((currentStepIndex + 1) / form.steps.length) * 100;
+  // Determine what to show
+  const isMetadataScreen = currentStepIndex === -1;
+  const hasMetadata = form.metadataSchema && Object.keys(form.metadataSchema).length > 0;
+
+  let progress = 0;
+  let stepTitle = '';
+
+  if (isMetadataScreen) {
+    progress = 0;
+    stepTitle = 'Información del Formulario';
+  } else {
+    const totalSteps = form.steps.length;
+    progress = ((currentStepIndex + 1) / totalSteps) * 100;
+    stepTitle = form.steps[currentStepIndex].title;
+  }
 
   return (
     <>
@@ -477,20 +664,32 @@ export default function FillSubmissionScreen() {
             <View style={[styles.progressFill, {width: `${progress}%`}]} />
           </View>
           <Text style={styles.progressText}>
-            Paso {currentStepIndex + 1} de {form.steps.length}
+            {isMetadataScreen
+              ? 'Información Inicial'
+              : `Paso ${currentStepIndex + 1} de ${form.steps.length}`}
           </Text>
         </View>
 
         {/* Step Content */}
         <ScrollView style={styles.stepContent}>
-          <Text style={styles.stepTitle}>{currentStep.title}</Text>
+          <Text style={styles.stepTitle}>{stepTitle}</Text>
 
-          {currentStep.questions.map(question => renderQuestion(question))}
+          {isMetadataScreen && hasMetadata ? (
+            // Render metadata fields
+            Object.entries(form.metadataSchema).map(([key, field]) =>
+              renderMetadataField(key, field),
+            )
+          ) : !isMetadataScreen ? (
+            // Render questions
+            form.steps[currentStepIndex].questions.map(question =>
+              renderQuestion(question),
+            )
+          ) : null}
         </ScrollView>
 
         {/* Navigation Buttons */}
         <View style={styles.navigationContainer}>
-          {currentStepIndex > 0 && (
+          {currentStepIndex > -1 && (
             <TouchableOpacity
               style={styles.navButton}
               onPress={handlePrevious}>
@@ -501,7 +700,9 @@ export default function FillSubmissionScreen() {
             style={[styles.navButton, styles.navButtonPrimary]}
             onPress={handleNext}>
             <Text style={[styles.navButtonText, styles.navButtonTextPrimary]}>
-              {currentStepIndex < form.steps.length - 1
+              {isMetadataScreen
+                ? 'Continuar'
+                : currentStepIndex < form.steps.length - 1
                 ? 'Siguiente'
                 : 'Completar'}
             </Text>

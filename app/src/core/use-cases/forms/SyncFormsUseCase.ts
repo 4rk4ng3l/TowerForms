@@ -44,6 +44,7 @@ export class SyncFormsUseCase {
       name: data.name,
       description: data.description || null,
       version: data.version || 1,
+      metadataSchema: data.metadataSchema || null,
       steps: (data.steps || []).map((step: any) => ({
         id: step.id,
         stepNumber: step.stepNumber,

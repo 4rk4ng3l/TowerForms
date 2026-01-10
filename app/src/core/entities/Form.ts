@@ -1,3 +1,14 @@
+export interface FormMetadataField {
+  type: 'text' | 'date' | 'time' | 'select';
+  label: string;
+  required: boolean;
+  options?: string[];
+}
+
+export type FormMetadataSchema = {
+  [key: string]: FormMetadataField;
+};
+
 export interface FormStep {
   id: string;
   stepNumber: number;
@@ -8,7 +19,7 @@ export interface FormStep {
 export interface Question {
   id: string;
   questionText: string;
-  type: 'text' | 'multiple_choice' | 'single_choice' | 'file';
+  type: 'text' | 'multiple_choice' | 'single_choice' | 'file' | 'number' | 'file_upload';
   options: string[] | null;
   isRequired: boolean;
   orderNumber: number;
@@ -23,6 +34,7 @@ export interface Form {
   name: string;
   description: string | null;
   version: number;
+  metadataSchema: FormMetadataSchema | null;
   steps: FormStep[];
   createdAt: Date;
   updatedAt: Date;

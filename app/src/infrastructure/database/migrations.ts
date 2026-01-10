@@ -7,7 +7,7 @@ interface Migration {
 }
 
 const MIGRATIONS_TABLE = 'migrations';
-const CURRENT_VERSION = 2;
+const CURRENT_VERSION = 3;
 
 const migrations: Migration[] = [
   {
@@ -34,6 +34,7 @@ const migrations: Migration[] = [
           name TEXT NOT NULL,
           description TEXT,
           version INTEGER NOT NULL DEFAULT 1,
+          metadata_schema TEXT,
           created_at TEXT NOT NULL,
           updated_at TEXT NOT NULL
         );
@@ -226,6 +227,18 @@ const migrations: Migration[] = [
       `);
 
       console.log('[Migration] Migration v2 completed successfully');
+    },
+  },
+  {
+    version: 3,
+    name: 'add_form_metadata_schema',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      console.log('[Migration] Running migration v3: add_form_metadata_schema');
+
+      // Add metadata_schema column to forms table using runAsync
+      await db.runAsync('ALTER TABLE forms ADD COLUMN metadata_schema TEXT');
+
+      console.log('[Migration] Migration v3 completed successfully');
     },
   },
 ];

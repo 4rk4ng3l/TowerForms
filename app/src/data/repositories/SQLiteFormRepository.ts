@@ -41,8 +41,8 @@ export class SQLiteFormRepository implements IFormRepository {
     await this.db.transaction(async tx => {
       // Insert or replace form
       const formSql = `
-        INSERT OR REPLACE INTO forms (id, name, description, version, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO forms (id, name, description, version, metadata_schema, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
       `;
 
       await tx.executeSql(formSql, [
@@ -50,6 +50,7 @@ export class SQLiteFormRepository implements IFormRepository {
         form.name,
         form.description,
         form.version,
+        form.metadataSchema ? JSON.stringify(form.metadataSchema) : null,
         form.createdAt.toISOString(),
         form.updatedAt.toISOString(),
       ]);
@@ -181,6 +182,7 @@ export class SQLiteFormRepository implements IFormRepository {
       name: row.name,
       description: row.description,
       version: row.version,
+      metadataSchema: row.metadata_schema ? JSON.parse(row.metadata_schema) : null,
       steps,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),

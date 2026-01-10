@@ -22,8 +22,21 @@ export default function RootLayout() {
     async function initialize() {
       try {
         console.log('[RootLayout] Initializing database...');
-        await database.init();
-        console.log('[RootLayout] Database initialized successfully');
+        try {
+          await database.init();
+          console.log('[RootLayout] Database initialized successfully');
+        } catch (dbError) {
+          console.error('[RootLayout] Database init failed, attempting to reset...', dbError);
+          // If database initialization fails, drop all tables and try again
+          try {
+            await database.dropAllTables();
+            await database.init();
+            console.log('[RootLayout] Database reset and initialized successfully');
+          } catch (resetError) {
+            console.error('[RootLayout] Database reset also failed:', resetError);
+            throw resetError;
+          }
+        }
 
         console.log('[RootLayout] Loading user...');
         await loadUser();
