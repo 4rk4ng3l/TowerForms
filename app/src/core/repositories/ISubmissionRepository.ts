@@ -22,12 +22,12 @@ export interface ISubmissionRepository {
   findByFormId(formId: string): Promise<SubmissionEntity[]>;
 
   /**
-   * Gets submissions by status
+   * Gets all completed submissions (where completed_at IS NOT NULL)
    */
-  findByStatus(status: 'draft' | 'completed' | 'synced'): Promise<SubmissionEntity[]>;
+  findCompleted(): Promise<SubmissionEntity[]>;
 
   /**
-   * Gets unsynced submissions (draft or completed but not synced)
+   * Gets unsynced submissions (completed but with sync_status = 'pending' or 'failed')
    */
   findUnsynced(): Promise<SubmissionEntity[]>;
 
@@ -52,6 +52,11 @@ export interface ISubmissionRepository {
   markAsSynced(id: string): Promise<void>;
 
   /**
+   * Marks a submission as failed
+   */
+  markAsFailed(id: string): Promise<void>;
+
+  /**
    * Deletes a submission by ID
    */
   delete(id: string): Promise<void>;
@@ -62,7 +67,12 @@ export interface ISubmissionRepository {
   findAll(): Promise<SubmissionEntity[]>;
 
   /**
-   * Counts submissions by status
+   * Counts completed submissions
    */
-  countByStatus(status: 'draft' | 'completed' | 'synced'): Promise<number>;
+  countCompleted(): Promise<number>;
+
+  /**
+   * Counts unsynced submissions
+   */
+  countUnsynced(): Promise<number>;
 }

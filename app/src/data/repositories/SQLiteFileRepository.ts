@@ -1,5 +1,5 @@
 import {IFileRepository} from '@core/repositories/IFileRepository';
-import {FileEntity, FileStatus} from '@core/entities/File';
+import {FileEntity, SyncStatus} from '@core/entities/File';
 import {database} from '@infrastructure/database/database';
 
 export class SQLiteFileRepository implements IFileRepository {
@@ -8,21 +8,21 @@ export class SQLiteFileRepository implements IFileRepository {
 
     await db.executeSql(
       `INSERT INTO files (
-        id, submission_id, question_id, file_name, mime_type,
-        size, local_uri, base64_data, status, created_at, synced_at
+        id, submission_id, step_id, question_id, local_path, remote_path,
+        file_name, file_size, mime_type, sync_status, created_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         file.id,
         file.submissionId,
+        file.stepId,
         file.questionId,
+        file.localPath,
+        file.remotePath,
         file.fileName,
+        file.fileSize,
         file.mimeType,
-        file.size,
-        file.localUri,
-        file.base64Data || null,
-        file.status,
+        file.syncStatus,
         file.createdAt.toISOString(),
-        file.syncedAt?.toISOString() || null,
       ],
     );
 
@@ -54,6 +54,17 @@ export class SQLiteFileRepository implements IFileRepository {
     return result.rows._array.map(row => this.mapRowToEntity(row));
   }
 
+  async findByStepId(stepId: string): Promise<FileEntity[]> {
+    const db = database;
+
+    const result = await db.executeSql(
+      'SELECT * FROM files WHERE step_id = ? ORDER BY created_at DESC',
+      [stepId],
+    );
+
+    return result.rows._array.map(row => this.mapRowToEntity(row));
+  }
+
   async findByQuestionId(
     submissionId: string,
     questionId: string,
@@ -68,23 +79,12 @@ export class SQLiteFileRepository implements IFileRepository {
     return result.rows._array.map(row => this.mapRowToEntity(row));
   }
 
-  async findByStatus(status: FileStatus): Promise<FileEntity[]> {
-    const db = database;
-
-    const result = await db.executeSql(
-      'SELECT * FROM files WHERE status = ? ORDER BY created_at DESC',
-      [status],
-    );
-
-    return result.rows._array.map(row => this.mapRowToEntity(row));
-  }
-
   async findUnsynced(): Promise<FileEntity[]> {
     const db = database;
 
     const result = await db.executeSql(
       `SELECT * FROM files
-       WHERE status IN ('pending', 'uploading', 'error')
+       WHERE sync_status IN ('pending', 'failed')
        ORDER BY created_at DESC`,
     );
 
@@ -96,12 +96,12 @@ export class SQLiteFileRepository implements IFileRepository {
 
     await db.executeSql(
       `UPDATE files
-       SET base64_data = ?, status = ?, synced_at = ?
+       SET local_path = ?, remote_path = ?, sync_status = ?
        WHERE id = ?`,
       [
-        file.base64Data || null,
-        file.status,
-        file.syncedAt?.toISOString() || null,
+        file.localPath,
+        file.remotePath,
+        file.syncStatus,
         file.id,
       ],
     );
@@ -109,37 +109,37 @@ export class SQLiteFileRepository implements IFileRepository {
     console.log(`[SQLiteFileRepository] Updated file: ${file.id}`);
   }
 
-  async markAsUploading(id: string): Promise<void> {
+  async markAsSyncing(id: string): Promise<void> {
     const db = database;
 
-    await db.executeSql('UPDATE files SET status = ? WHERE id = ?', [
-      'uploading',
+    await db.executeSql('UPDATE files SET sync_status = ? WHERE id = ?', [
+      'syncing',
       id,
     ]);
 
-    console.log(`[SQLiteFileRepository] Marked file as uploading: ${id}`);
+    console.log(`[SQLiteFileRepository] Marked file as syncing: ${id}`);
   }
 
-  async markAsSynced(id: string): Promise<void> {
+  async markAsSynced(id: string, remotePath: string): Promise<void> {
     const db = database;
 
     await db.executeSql(
-      'UPDATE files SET status = ?, synced_at = ? WHERE id = ?',
-      ['synced', new Date().toISOString(), id],
+      'UPDATE files SET sync_status = ?, remote_path = ? WHERE id = ?',
+      ['synced', remotePath, id],
     );
 
     console.log(`[SQLiteFileRepository] Marked file as synced: ${id}`);
   }
 
-  async markAsError(id: string): Promise<void> {
+  async markAsFailed(id: string): Promise<void> {
     const db = database;
 
-    await db.executeSql('UPDATE files SET status = ? WHERE id = ?', [
-      'error',
+    await db.executeSql('UPDATE files SET sync_status = ? WHERE id = ?', [
+      'failed',
       id,
     ]);
 
-    console.log(`[SQLiteFileRepository] Marked file as error: ${id}`);
+    console.log(`[SQLiteFileRepository] Marked file as failed: ${id}`);
   }
 
   async delete(id: string): Promise<void> {
@@ -160,19 +160,30 @@ export class SQLiteFileRepository implements IFileRepository {
     return result.rows._array.map(row => this.mapRowToEntity(row));
   }
 
+  async countUnsynced(): Promise<number> {
+    const db = database;
+
+    const result = await db.executeSql(
+      `SELECT COUNT(*) as count FROM files
+       WHERE sync_status IN ('pending', 'failed')`,
+    );
+
+    return result.rows.item(0).count;
+  }
+
   private mapRowToEntity(row: any): FileEntity {
     return new FileEntity(
       row.id,
       row.submission_id,
+      row.step_id,
       row.question_id,
+      row.local_path,
+      row.remote_path,
       row.file_name,
+      row.file_size,
       row.mime_type,
-      row.size,
-      row.local_uri,
-      row.base64_data,
-      row.status,
+      row.sync_status as SyncStatus,
       new Date(row.created_at),
-      row.synced_at ? new Date(row.synced_at) : undefined,
     );
   }
 }

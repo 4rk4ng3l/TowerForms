@@ -7,7 +7,7 @@ interface Migration {
 }
 
 const MIGRATIONS_TABLE = 'migrations';
-const CURRENT_VERSION = 3;
+const CURRENT_VERSION = 4;
 
 const migrations: Migration[] = [
   {
@@ -239,6 +239,169 @@ const migrations: Migration[] = [
       await db.runAsync('ALTER TABLE forms ADD COLUMN metadata_schema TEXT');
 
       console.log('[Migration] Migration v3 completed successfully');
+    },
+  },
+  {
+    version: 4,
+    name: 'update_sync_model',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      console.log('[Migration] Running migration v4: update_sync_model');
+
+      // Update submissions table
+      console.log('[Migration] Updating submissions table...');
+
+      // Create new submissions table with updated schema
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS submissions_new (
+          id TEXT PRIMARY KEY,
+          form_id TEXT NOT NULL,
+          user_id TEXT,
+          metadata TEXT,
+          started_at TEXT NOT NULL,
+          completed_at TEXT,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          synced_at TEXT,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          FOREIGN KEY (form_id) REFERENCES forms(id),
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+      `);
+
+      // Migrate data from old table to new table
+      await db.execAsync(`
+        INSERT INTO submissions_new (
+          id, form_id, user_id, metadata, started_at, completed_at,
+          sync_status, synced_at, created_at, updated_at
+        )
+        SELECT
+          id,
+          form_id,
+          user_id,
+          metadata,
+          created_at as started_at,
+          CASE WHEN status = 'completed' OR status = 'synced' THEN updated_at ELSE NULL END as completed_at,
+          CASE WHEN status = 'synced' THEN 'synced' ELSE 'pending' END as sync_status,
+          synced_at,
+          created_at,
+          updated_at
+        FROM submissions;
+      `);
+
+      // Drop old table
+      await db.execAsync('DROP TABLE submissions;');
+
+      // Rename new table to submissions
+      await db.execAsync('ALTER TABLE submissions_new RENAME TO submissions;');
+
+      // Recreate indexes for submissions
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_submissions_form_id
+        ON submissions(form_id);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_submissions_user_id
+        ON submissions(user_id);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_submissions_sync_status
+        ON submissions(sync_status);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_submissions_user_sync_status
+        ON submissions(user_id, sync_status);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_submissions_form_sync_status
+        ON submissions(form_id, sync_status);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_submissions_created_at
+        ON submissions(created_at DESC);
+      `);
+
+      console.log('[Migration] Submissions table updated successfully');
+
+      // Update files table
+      console.log('[Migration] Updating files table...');
+
+      // Create new files table with updated schema
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS files_new (
+          id TEXT PRIMARY KEY,
+          submission_id TEXT NOT NULL,
+          step_id TEXT NOT NULL,
+          question_id TEXT,
+          local_path TEXT,
+          remote_path TEXT,
+          file_name TEXT NOT NULL,
+          file_size INTEGER NOT NULL,
+          mime_type TEXT NOT NULL,
+          sync_status TEXT NOT NULL DEFAULT 'pending',
+          created_at TEXT NOT NULL,
+          FOREIGN KEY (submission_id) REFERENCES submissions(id) ON DELETE CASCADE
+        );
+      `);
+
+      // Migrate data from old table to new table
+      // We need to infer step_id from question_id by joining with questions table
+      await db.execAsync(`
+        INSERT INTO files_new (
+          id, submission_id, step_id, question_id, local_path, remote_path,
+          file_name, file_size, mime_type, sync_status, created_at
+        )
+        SELECT
+          f.id,
+          f.submission_id,
+          COALESCE(q.step_id, 'unknown') as step_id,
+          f.question_id,
+          f.local_uri as local_path,
+          NULL as remote_path,
+          f.file_name,
+          f.size as file_size,
+          f.mime_type,
+          CASE WHEN f.status = 'synced' THEN 'synced'
+               WHEN f.status = 'error' THEN 'failed'
+               ELSE 'pending' END as sync_status,
+          f.created_at
+        FROM files f
+        LEFT JOIN questions q ON f.question_id = q.id;
+      `);
+
+      // Drop old table
+      await db.execAsync('DROP TABLE files;');
+
+      // Rename new table to files
+      await db.execAsync('ALTER TABLE files_new RENAME TO files;');
+
+      // Recreate indexes for files
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_files_submission_id
+        ON files(submission_id);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_files_step_id
+        ON files(step_id);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_files_sync_status
+        ON files(sync_status);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_files_question_id
+        ON files(question_id);
+      `);
+
+      console.log('[Migration] Files table updated successfully');
+      console.log('[Migration] Migration v4 completed successfully');
     },
   },
 ];

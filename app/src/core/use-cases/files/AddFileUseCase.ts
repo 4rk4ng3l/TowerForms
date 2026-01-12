@@ -6,12 +6,12 @@ export class AddFileUseCase {
 
   async execute(
     submissionId: string,
-    questionId: string,
+    stepId: string,
+    questionId: string | null,
     uri: string,
     fileName: string,
     mimeType: string,
     size: number,
-    base64Data?: string,
   ): Promise<FileEntity> {
     try {
       console.log('[AddFileUseCase] Adding file:', fileName);
@@ -23,12 +23,12 @@ export class AddFileUseCase {
       const file = FileEntity.create(
         fileId,
         submissionId,
+        stepId,
         questionId,
         fileName,
         mimeType,
         size,
         uri,
-        base64Data,
       );
 
       // Save to database

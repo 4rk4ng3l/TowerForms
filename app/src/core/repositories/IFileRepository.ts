@@ -17,17 +17,17 @@ export interface IFileRepository {
   findBySubmissionId(submissionId: string): Promise<FileEntity[]>;
 
   /**
+   * Gets all files for a form step
+   */
+  findByStepId(stepId: string): Promise<FileEntity[]>;
+
+  /**
    * Gets all files for a question in a submission
    */
   findByQuestionId(submissionId: string, questionId: string): Promise<FileEntity[]>;
 
   /**
-   * Gets files by status
-   */
-  findByStatus(status: 'pending' | 'uploading' | 'synced' | 'error'): Promise<FileEntity[]>;
-
-  /**
-   * Gets unsynced files (pending, uploading, or error)
+   * Gets unsynced files (sync_status = 'pending' or 'failed')
    */
   findUnsynced(): Promise<FileEntity[]>;
 
@@ -37,19 +37,19 @@ export interface IFileRepository {
   update(file: FileEntity): Promise<void>;
 
   /**
-   * Marks a file as uploading
+   * Marks a file as syncing
    */
-  markAsUploading(id: string): Promise<void>;
+  markAsSyncing(id: string): Promise<void>;
 
   /**
-   * Marks a file as synced
+   * Marks a file as synced with remote path
    */
-  markAsSynced(id: string): Promise<void>;
+  markAsSynced(id: string, remotePath: string): Promise<void>;
 
   /**
-   * Marks a file as error
+   * Marks a file as failed
    */
-  markAsError(id: string): Promise<void>;
+  markAsFailed(id: string): Promise<void>;
 
   /**
    * Deletes a file by ID
@@ -60,4 +60,9 @@ export interface IFileRepository {
    * Gets all files
    */
   findAll(): Promise<FileEntity[]>;
+
+  /**
+   * Counts unsynced files
+   */
+  countUnsynced(): Promise<number>;
 }

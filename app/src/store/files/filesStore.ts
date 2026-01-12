@@ -14,12 +14,12 @@ interface FilesState {
 interface FilesActions {
   addFile: (
     submissionId: string,
-    questionId: string,
+    stepId: string,
+    questionId: string | null,
     uri: string,
     fileName: string,
     mimeType: string,
     size: number,
-    base64Data?: string,
   ) => Promise<FileEntity>;
   loadFilesForQuestion: (
     submissionId: string,
@@ -47,31 +47,32 @@ export const useFilesStore = create<FilesStore>((set, get) => ({
   // Actions
   addFile: async (
     submissionId: string,
-    questionId: string,
+    stepId: string,
+    questionId: string | null,
     uri: string,
     fileName: string,
     mimeType: string,
     size: number,
-    base64Data?: string,
   ) => {
     set({isLoading: true, error: null});
     try {
       const file = await addFileUseCase.execute(
         submissionId,
+        stepId,
         questionId,
         uri,
         fileName,
         mimeType,
         size,
-        base64Data,
       );
 
-      // Add to state
-      const currentFiles = get().files[questionId] || [];
+      // Add to state - use questionId as key, or 'general' if null
+      const stateKey = questionId || 'general';
+      const currentFiles = get().files[stateKey] || [];
       set({
         files: {
           ...get().files,
-          [questionId]: [...currentFiles, file],
+          [stateKey]: [...currentFiles, file],
         },
         isLoading: false,
         error: null,

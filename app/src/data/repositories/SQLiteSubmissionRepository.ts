@@ -1,5 +1,5 @@
 import {ISubmissionRepository} from '@core/repositories/ISubmissionRepository';
-import {SubmissionEntity, Answer} from '@core/entities/Submission';
+import {SubmissionEntity, Answer, SyncStatus} from '@core/entities/Submission';
 import {database} from '@infrastructure/database/database';
 
 export class SQLiteSubmissionRepository implements ISubmissionRepository {
@@ -10,18 +10,20 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
       // Insert submission
       await tx.executeSql(
         `INSERT INTO submissions (
-          id, form_id, user_id, metadata, status,
-          created_at, updated_at, synced_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          id, form_id, user_id, metadata, started_at, completed_at,
+          sync_status, synced_at, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           submission.id,
           submission.formId,
           submission.userId,
-          JSON.stringify(submission.metadata),
-          submission.status,
+          submission.metadata ? JSON.stringify(submission.metadata) : null,
+          submission.startedAt.toISOString(),
+          submission.completedAt?.toISOString() || null,
+          submission.syncStatus,
+          submission.syncedAt?.toISOString() || null,
           submission.createdAt.toISOString(),
           submission.updatedAt.toISOString(),
-          submission.syncedAt?.toISOString() || null,
         ],
       );
 
@@ -74,12 +76,13 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
     return await this.mapRowsToEntities(result.rows._array);
   }
 
-  async findByStatus(status: 'draft' | 'completed' | 'synced'): Promise<SubmissionEntity[]> {
+  async findCompleted(): Promise<SubmissionEntity[]> {
     const db = database;
 
     const result = await db.executeSql(
-      'SELECT * FROM submissions WHERE status = ? ORDER BY created_at DESC',
-      [status],
+      `SELECT * FROM submissions
+       WHERE completed_at IS NOT NULL
+       ORDER BY completed_at DESC`,
     );
 
     return await this.mapRowsToEntities(result.rows._array);
@@ -90,7 +93,8 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
 
     const result = await db.executeSql(
       `SELECT * FROM submissions
-       WHERE status IN ('draft', 'completed')
+       WHERE completed_at IS NOT NULL
+       AND sync_status IN ('pending', 'failed')
        ORDER BY created_at DESC`,
     );
 
@@ -104,13 +108,15 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
       // Update submission
       await tx.executeSql(
         `UPDATE submissions
-         SET metadata = ?, status = ?, updated_at = ?, synced_at = ?
+         SET metadata = ?, completed_at = ?, sync_status = ?,
+             synced_at = ?, updated_at = ?
          WHERE id = ?`,
         [
-          JSON.stringify(submission.metadata),
-          submission.status,
-          submission.updatedAt.toISOString(),
+          submission.metadata ? JSON.stringify(submission.metadata) : null,
+          submission.completedAt?.toISOString() || null,
+          submission.syncStatus,
           submission.syncedAt?.toISOString() || null,
+          submission.updatedAt.toISOString(),
           submission.id,
         ],
       );
@@ -174,8 +180,8 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
     const db = database;
 
     await db.executeSql(
-      'UPDATE submissions SET status = ?, updated_at = ? WHERE id = ?',
-      ['completed', new Date().toISOString(), id],
+      'UPDATE submissions SET completed_at = ?, updated_at = ? WHERE id = ?',
+      [new Date().toISOString(), new Date().toISOString(), id],
     );
 
     console.log(`[SQLiteSubmissionRepository] Marked submission as completed: ${id}`);
@@ -185,11 +191,22 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
     const db = database;
 
     await db.executeSql(
-      'UPDATE submissions SET status = ?, synced_at = ?, updated_at = ? WHERE id = ?',
+      'UPDATE submissions SET sync_status = ?, synced_at = ?, updated_at = ? WHERE id = ?',
       ['synced', new Date().toISOString(), new Date().toISOString(), id],
     );
 
     console.log(`[SQLiteSubmissionRepository] Marked submission as synced: ${id}`);
+  }
+
+  async markAsFailed(id: string): Promise<void> {
+    const db = database;
+
+    await db.executeSql(
+      'UPDATE submissions SET sync_status = ?, synced_at = NULL, updated_at = ? WHERE id = ?',
+      ['failed', new Date().toISOString(), id],
+    );
+
+    console.log(`[SQLiteSubmissionRepository] Marked submission as failed: ${id}`);
   }
 
   async delete(id: string): Promise<void> {
@@ -216,12 +233,23 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
     return await this.mapRowsToEntities(result.rows._array);
   }
 
-  async countByStatus(status: 'draft' | 'completed' | 'synced'): Promise<number> {
+  async countCompleted(): Promise<number> {
     const db = database;
 
     const result = await db.executeSql(
-      'SELECT COUNT(*) as count FROM submissions WHERE status = ?',
-      [status],
+      'SELECT COUNT(*) as count FROM submissions WHERE completed_at IS NOT NULL',
+    );
+
+    return result.rows.item(0).count;
+  }
+
+  async countUnsynced(): Promise<number> {
+    const db = database;
+
+    const result = await db.executeSql(
+      `SELECT COUNT(*) as count FROM submissions
+       WHERE completed_at IS NOT NULL
+       AND sync_status IN ('pending', 'failed')`,
     );
 
     return result.rows.item(0).count;
@@ -276,11 +304,13 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
       row.form_id,
       row.user_id,
       answers,
-      JSON.parse(row.metadata),
-      row.status,
+      row.metadata ? JSON.parse(row.metadata) : null,
+      new Date(row.started_at),
+      row.completed_at ? new Date(row.completed_at) : null,
+      row.sync_status as SyncStatus,
+      row.synced_at ? new Date(row.synced_at) : null,
       new Date(row.created_at),
       new Date(row.updated_at),
-      row.synced_at ? new Date(row.synced_at) : undefined,
     );
   }
 }

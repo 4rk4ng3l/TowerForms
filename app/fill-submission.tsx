@@ -63,13 +63,11 @@ export default function FillSubmissionScreen() {
         const existingMetadata = {...currentSubmission.metadata};
         setMetadataValues(existingMetadata);
 
-        // Load files for file_upload questions
+        // Load files for all questions
         if (loadedForm) {
           for (const step of loadedForm.steps) {
             for (const question of step.questions) {
-              if (question.type === 'file_upload') {
-                await loadFilesForQuestion(currentSubmission.id, question.id);
-              }
+              await loadFilesForQuestion(currentSubmission.id, question.id);
             }
           }
         }
@@ -215,7 +213,7 @@ export default function FillSubmissionScreen() {
   };
 
   const handleTakePhoto = async (questionId: string) => {
-    if (!currentSubmission) return;
+    if (!currentSubmission || !form || currentStepIndex === -1) return;
 
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) return;
@@ -230,9 +228,11 @@ export default function FillSubmissionScreen() {
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         const fileName = `photo_${Date.now()}.jpg`;
+        const currentStep = form.steps[currentStepIndex];
 
         await addFile(
           currentSubmission.id,
+          currentStep.id,
           questionId,
           asset.uri,
           fileName,
@@ -250,7 +250,7 @@ export default function FillSubmissionScreen() {
   };
 
   const handlePickImage = async (questionId: string) => {
-    if (!currentSubmission) return;
+    if (!currentSubmission || !form || currentStepIndex === -1) return;
 
     const hasPermission = await requestGalleryPermission();
     if (!hasPermission) return;
@@ -265,9 +265,11 @@ export default function FillSubmissionScreen() {
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         const fileName = asset.fileName || `image_${Date.now()}.jpg`;
+        const currentStep = form.steps[currentStepIndex];
 
         await addFile(
           currentSubmission.id,
+          currentStep.id,
           questionId,
           asset.uri,
           fileName,
@@ -427,6 +429,58 @@ export default function FillSubmissionScreen() {
     }
   };
 
+  const renderFileAttachments = (questionId: string) => {
+    const questionFiles = files[questionId] || [];
+
+    return (
+      <>
+        {/* Upload Buttons */}
+        <View style={styles.uploadButtonsContainer}>
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={() => handleTakePhoto(questionId)}>
+            <Text style={styles.uploadButtonText}>📷 Tomar Foto</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.uploadButton}
+            onPress={() => handlePickImage(questionId)}>
+            <Text style={styles.uploadButtonText}>🖼️ Galería</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Display uploaded files */}
+        {questionFiles.length > 0 && (
+          <View style={styles.filesContainer}>
+            {questionFiles.map(file => (
+              <View key={file.id} style={styles.filePreview}>
+                {file.isImage() && file.localPath && (
+                  <Image
+                    source={{uri: file.localPath}}
+                    style={styles.imagePreview}
+                    resizeMode="cover"
+                  />
+                )}
+                <View style={styles.fileInfo}>
+                  <Text style={styles.fileName} numberOfLines={1}>
+                    {file.fileName}
+                  </Text>
+                  <Text style={styles.fileSize}>
+                    {(file.fileSize / 1024).toFixed(1)} KB
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => handleDeleteFile(file.id, questionId)}>
+                  <Text style={styles.deleteButtonText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+      </>
+    );
+  };
+
   const renderQuestion = (question: Question) => {
     const value = answers[question.id] || '';
 
@@ -445,6 +499,7 @@ export default function FillSubmissionScreen() {
               placeholder="Ingrese su respuesta"
               multiline
             />
+            {renderFileAttachments(question.id)}
           </View>
         );
 
@@ -465,6 +520,7 @@ export default function FillSubmissionScreen() {
               placeholder="Ingrese un número"
               keyboardType="numeric"
             />
+            {renderFileAttachments(question.id)}
           </View>
         );
 
@@ -494,6 +550,7 @@ export default function FillSubmissionScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+            {renderFileAttachments(question.id)}
           </View>
         );
 
@@ -532,61 +589,18 @@ export default function FillSubmissionScreen() {
                 );
               })}
             </View>
+            {renderFileAttachments(question.id)}
           </View>
         );
 
       case 'file_upload':
-        const questionFiles = files[question.id] || [];
         return (
           <View key={question.id} style={styles.questionContainer}>
             <Text style={styles.questionText}>
               {question.questionText}
               {question.isRequired && <Text style={styles.required}> *</Text>}
             </Text>
-
-            {/* Upload Buttons */}
-            <View style={styles.uploadButtonsContainer}>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={() => handleTakePhoto(question.id)}>
-                <Text style={styles.uploadButtonText}>📷 Tomar Foto</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.uploadButton}
-                onPress={() => handlePickImage(question.id)}>
-                <Text style={styles.uploadButtonText}>🖼️ Galería</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Display uploaded files */}
-            {questionFiles.length > 0 && (
-              <View style={styles.filesContainer}>
-                {questionFiles.map(file => (
-                  <View key={file.id} style={styles.filePreview}>
-                    {file.isImage() && (
-                      <Image
-                        source={{uri: file.localUri}}
-                        style={styles.imagePreview}
-                        resizeMode="cover"
-                      />
-                    )}
-                    <View style={styles.fileInfo}>
-                      <Text style={styles.fileName} numberOfLines={1}>
-                        {file.fileName}
-                      </Text>
-                      <Text style={styles.fileSize}>
-                        {(file.size / 1024).toFixed(1)} KB
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleDeleteFile(file.id, question.id)}>
-                      <Text style={styles.deleteButtonText}>✕</Text>
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
+            {renderFileAttachments(question.id)}
           </View>
         );
 

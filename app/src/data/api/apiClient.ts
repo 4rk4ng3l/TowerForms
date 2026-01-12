@@ -298,6 +298,52 @@ export class ApiClient {
     return response.data.data;
   }
 
+  // Export Methods
+  /**
+   * Download submission data as Excel file
+   * Returns the file URL from backend
+   */
+  async downloadSubmissionExcel(submissionId: string): Promise<{
+    url: string;
+    fileName: string;
+  }> {
+    const response = await this.client.get(
+      API_ENDPOINTS.EXPORT_SUBMISSION_EXCEL(submissionId),
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Download images for a specific step as ZIP file
+   * Returns the file URL from backend
+   */
+  async downloadSubmissionStepImages(
+    submissionId: string,
+    stepNumber: number,
+  ): Promise<{
+    url: string;
+    fileName: string;
+  }> {
+    const response = await this.client.get(
+      API_ENDPOINTS.EXPORT_SUBMISSION_IMAGES(submissionId, stepNumber),
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Download complete package (Excel + all step images as ZIPs)
+   * Returns array of file URLs from backend
+   */
+  async downloadSubmissionPackage(submissionId: string): Promise<{
+    excel: {url: string; fileName: string};
+    images: Array<{url: string; fileName: string; stepNumber: number}>;
+  }> {
+    const response = await this.client.get(
+      API_ENDPOINTS.EXPORT_SUBMISSION_PACKAGE(submissionId),
+    );
+    return response.data.data;
+  }
+
   // Generic request method for custom calls
   async request<T>(
     method: 'GET' | 'POST' | 'PUT' | 'DELETE',

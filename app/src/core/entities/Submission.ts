@@ -1,4 +1,4 @@
-export type SubmissionStatus = 'draft' | 'completed' | 'synced';
+export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
 
 export interface Answer {
   questionId: string;
@@ -7,11 +7,7 @@ export interface Answer {
 }
 
 export interface SubmissionMetadata {
-  deviceId: string;
-  location?: {lat: number; lng: number};
-  startedAt: Date;
-  completedAt?: Date;
-  [key: string]: any; // Allow additional metadata fields
+  [key: string]: any; // Flexible metadata based on Form's metadataSchema
 }
 
 export interface Submission {
@@ -19,11 +15,13 @@ export interface Submission {
   formId: string;
   userId: string;
   answers: Answer[];
-  metadata: SubmissionMetadata;
-  status: SubmissionStatus;
+  metadata: SubmissionMetadata | null;
+  startedAt: Date;
+  completedAt: Date | null;
+  syncStatus: SyncStatus;
+  syncedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  syncedAt?: Date;
 }
 
 export class SubmissionEntity implements Submission {
@@ -32,35 +30,35 @@ export class SubmissionEntity implements Submission {
     public readonly formId: string,
     public readonly userId: string,
     public readonly answers: Answer[],
-    public readonly metadata: SubmissionMetadata,
-    public readonly status: SubmissionStatus,
+    public readonly metadata: SubmissionMetadata | null,
+    public readonly startedAt: Date,
+    public readonly completedAt: Date | null,
+    public readonly syncStatus: SyncStatus,
+    public readonly syncedAt: Date | null,
     public readonly createdAt: Date,
     public readonly updatedAt: Date,
-    public readonly syncedAt?: Date,
   ) {}
 
   static create(
     id: string,
     formId: string,
     userId: string,
-    metadata: Partial<SubmissionMetadata> = {},
+    metadata: SubmissionMetadata | null = null,
   ): SubmissionEntity {
     const now = new Date();
-    const fullMetadata: SubmissionMetadata = {
-      deviceId: '', // Will be set from device info
-      startedAt: now,
-      ...metadata,
-    };
 
     return new SubmissionEntity(
       id,
       formId,
       userId,
       [], // Empty answers initially
-      fullMetadata,
-      'draft',
-      now,
-      now,
+      metadata,
+      now, // startedAt
+      null, // completedAt
+      'pending', // syncStatus
+      null, // syncedAt
+      now, // createdAt
+      now, // updatedAt
     );
   }
 
@@ -85,52 +83,48 @@ export class SubmissionEntity implements Submission {
       this.userId,
       newAnswers,
       this.metadata,
-      this.status,
-      this.createdAt,
-      new Date(), // Update timestamp
+      this.startedAt,
+      this.completedAt,
+      this.syncStatus,
       this.syncedAt,
+      this.createdAt,
+      new Date(), // updatedAt
     );
   }
 
-  updateMetadata(newMetadata: Partial<SubmissionMetadata>): SubmissionEntity {
-    const updatedMetadata: SubmissionMetadata = {
-      ...this.metadata,
-      ...newMetadata,
-    };
-
+  updateMetadata(newMetadata: SubmissionMetadata): SubmissionEntity {
     return new SubmissionEntity(
       this.id,
       this.formId,
       this.userId,
       this.answers,
-      updatedMetadata,
-      this.status,
-      this.createdAt,
-      new Date(), // Update timestamp
+      newMetadata,
+      this.startedAt,
+      this.completedAt,
+      this.syncStatus,
       this.syncedAt,
+      this.createdAt,
+      new Date(), // updatedAt
     );
   }
 
   complete(): SubmissionEntity {
-    if (this.status === 'completed' || this.status === 'synced') {
-      return this;
+    if (this.completedAt !== null) {
+      return this; // Already completed
     }
-
-    const updatedMetadata: SubmissionMetadata = {
-      ...this.metadata,
-      completedAt: new Date(),
-    };
 
     return new SubmissionEntity(
       this.id,
       this.formId,
       this.userId,
       this.answers,
-      updatedMetadata,
-      'completed',
-      this.createdAt,
-      new Date(),
+      this.metadata,
+      this.startedAt,
+      new Date(), // completedAt
+      this.syncStatus,
       this.syncedAt,
+      this.createdAt,
+      new Date(), // updatedAt
     );
   }
 
@@ -141,19 +135,41 @@ export class SubmissionEntity implements Submission {
       this.userId,
       this.answers,
       this.metadata,
+      this.startedAt,
+      this.completedAt,
       'synced',
+      new Date(), // syncedAt
       this.createdAt,
-      this.updatedAt,
-      new Date(),
+      new Date(), // updatedAt
+    );
+  }
+
+  markAsFailed(): SubmissionEntity {
+    return new SubmissionEntity(
+      this.id,
+      this.formId,
+      this.userId,
+      this.answers,
+      this.metadata,
+      this.startedAt,
+      this.completedAt,
+      'failed',
+      null, // syncedAt
+      this.createdAt,
+      new Date(), // updatedAt
     );
   }
 
   isCompleted(): boolean {
-    return this.status === 'completed' || this.status === 'synced';
+    return this.completedAt !== null;
   }
 
   isSynced(): boolean {
-    return this.status === 'synced';
+    return this.syncStatus === 'synced';
+  }
+
+  needsSync(): boolean {
+    return this.isCompleted() && !this.isSynced();
   }
 
   toJson(): any {
@@ -162,15 +178,13 @@ export class SubmissionEntity implements Submission {
       formId: this.formId,
       userId: this.userId,
       answers: this.answers,
-      metadata: {
-        ...this.metadata,
-        startedAt: this.metadata.startedAt.toISOString(),
-        completedAt: this.metadata.completedAt?.toISOString(),
-      },
-      status: this.status,
+      metadata: this.metadata,
+      startedAt: this.startedAt.toISOString(),
+      completedAt: this.completedAt?.toISOString(),
+      syncStatus: this.syncStatus,
+      syncedAt: this.syncedAt?.toISOString(),
       createdAt: this.createdAt.toISOString(),
       updatedAt: this.updatedAt.toISOString(),
-      syncedAt: this.syncedAt?.toISOString(),
     };
   }
 }

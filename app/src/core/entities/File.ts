@@ -1,96 +1,109 @@
-export type FileStatus = 'pending' | 'uploading' | 'synced' | 'error';
+export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
 
 export interface FileAttachment {
   id: string;
   submissionId: string;
-  questionId: string;
+  stepId: string;
+  questionId: string | null;
+  localPath: string | null;
+  remotePath: string | null;
   fileName: string;
+  fileSize: number;
   mimeType: string;
-  size: number;
-  localUri: string;
-  base64Data?: string; // For sync
-  status: FileStatus;
+  syncStatus: SyncStatus;
   createdAt: Date;
-  syncedAt?: Date;
 }
 
 export class FileEntity implements FileAttachment {
   constructor(
     public readonly id: string,
     public readonly submissionId: string,
-    public readonly questionId: string,
+    public readonly stepId: string,
+    public readonly questionId: string | null,
+    public readonly localPath: string | null,
+    public readonly remotePath: string | null,
     public readonly fileName: string,
+    public readonly fileSize: number,
     public readonly mimeType: string,
-    public readonly size: number,
-    public readonly localUri: string,
-    public readonly base64Data: string | undefined,
-    public readonly status: FileStatus,
+    public readonly syncStatus: SyncStatus,
     public readonly createdAt: Date,
-    public readonly syncedAt?: Date,
   ) {}
 
   static create(
     id: string,
     submissionId: string,
-    questionId: string,
+    stepId: string,
+    questionId: string | null,
     fileName: string,
     mimeType: string,
-    size: number,
-    localUri: string,
-    base64Data?: string,
+    fileSize: number,
+    localPath: string,
   ): FileEntity {
     return new FileEntity(
       id,
       submissionId,
+      stepId,
       questionId,
+      localPath,
+      null, // remotePath
       fileName,
+      fileSize,
       mimeType,
-      size,
-      localUri,
-      base64Data,
       'pending',
       new Date(),
     );
   }
 
-  setStatus(status: FileStatus): FileEntity {
+  markAsSyncing(): FileEntity {
     return new FileEntity(
       this.id,
       this.submissionId,
+      this.stepId,
       this.questionId,
+      this.localPath,
+      this.remotePath,
       this.fileName,
+      this.fileSize,
       this.mimeType,
-      this.size,
-      this.localUri,
-      this.base64Data,
-      status,
+      'syncing',
       this.createdAt,
-      this.syncedAt,
     );
   }
 
-  markAsUploading(): FileEntity {
-    return this.setStatus('uploading');
-  }
-
-  markAsSynced(): FileEntity {
+  markAsSynced(remotePath: string): FileEntity {
     return new FileEntity(
       this.id,
       this.submissionId,
+      this.stepId,
       this.questionId,
+      this.localPath,
+      remotePath,
       this.fileName,
+      this.fileSize,
       this.mimeType,
-      this.size,
-      this.localUri,
-      this.base64Data,
       'synced',
       this.createdAt,
-      new Date(),
     );
   }
 
-  markAsError(): FileEntity {
-    return this.setStatus('error');
+  markAsFailed(): FileEntity {
+    return new FileEntity(
+      this.id,
+      this.submissionId,
+      this.stepId,
+      this.questionId,
+      this.localPath,
+      this.remotePath,
+      this.fileName,
+      this.fileSize,
+      this.mimeType,
+      'failed',
+      this.createdAt,
+    );
+  }
+
+  isSynced(): boolean {
+    return this.syncStatus === 'synced';
   }
 
   isImage(): boolean {
@@ -109,15 +122,15 @@ export class FileEntity implements FileAttachment {
     return {
       id: this.id,
       submissionId: this.submissionId,
+      stepId: this.stepId,
       questionId: this.questionId,
+      localPath: this.localPath,
+      remotePath: this.remotePath,
       fileName: this.fileName,
+      fileSize: this.fileSize,
       mimeType: this.mimeType,
-      size: this.size,
-      localUri: this.localUri,
-      base64Data: this.base64Data,
-      status: this.status,
+      syncStatus: this.syncStatus,
       createdAt: this.createdAt.toISOString(),
-      syncedAt: this.syncedAt?.toISOString(),
     };
   }
 }

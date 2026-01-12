@@ -8,7 +8,7 @@ export const API_CONFIG = {
     ? 'http://10.0.2.2:3000/api' // Android emulator - use localhost for iOS/Web
     : 'https://api.towerforms.com/api', // Production
 
-  TIMEOUT: 30000, // 30 seconds
+  TIMEOUT: 120000, // 120 seconds (2 minutes) for sync operations with large files
   RETRY_ATTEMPTS: 3,
 } as const;
 
@@ -35,4 +35,10 @@ export const API_ENDPOINTS = {
   FILES_UPLOAD: '/files/upload',
   FILE_BY_ID: (id: string) => `/files/${id}`,
   FILE_DOWNLOAD: (id: string) => `/files/${id}/download`,
+
+  // Export
+  EXPORT_SUBMISSION_EXCEL: (id: string) => `/export/submissions/${id}/excel`,
+  EXPORT_SUBMISSION_IMAGES: (id: string, stepNumber: number) =>
+    `/export/submissions/${id}/images/step/${stepNumber}`,
+  EXPORT_SUBMISSION_PACKAGE: (id: string) => `/export/submissions/${id}/package`,
 } as const;

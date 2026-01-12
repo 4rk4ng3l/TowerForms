@@ -5,20 +5,30 @@ import {UpdateSubmissionUseCase} from '@core/use-cases/submissions/UpdateSubmiss
 import {UpdateSubmissionMetadataUseCase} from '@core/use-cases/submissions/UpdateSubmissionMetadataUseCase';
 import {CompleteSubmissionUseCase} from '@core/use-cases/submissions/CompleteSubmissionUseCase';
 import {GetSubmissionUseCase} from '@core/use-cases/submissions/GetSubmissionUseCase';
+import {GetAllSubmissionsUseCase} from '@core/use-cases/submissions/GetAllSubmissionsUseCase';
+import {GetCompletedSubmissionsUseCase} from '@core/use-cases/submissions/GetCompletedSubmissionsUseCase';
+import {SyncSubmissionsUseCase} from '@core/use-cases/submissions/SyncSubmissionsUseCase';
 import {SQLiteSubmissionRepository} from '@data/repositories/SQLiteSubmissionRepository';
+import {SQLiteFileRepository} from '@data/repositories/SQLiteFileRepository';
 
 interface SubmissionsState {
   currentSubmission: SubmissionEntity | null;
+  submissions: SubmissionEntity[];
+  completedSubmissions: SubmissionEntity[];
   isLoading: boolean;
+  isSyncing: boolean;
   error: string | null;
 }
 
 interface SubmissionsActions {
   createSubmission: (formId: string, userId: string) => Promise<SubmissionEntity>;
   loadSubmission: (submissionId: string) => Promise<void>;
+  loadAllSubmissions: () => Promise<void>;
+  loadCompletedSubmissions: () => Promise<void>;
   updateAnswer: (submissionId: string, answer: Answer) => Promise<void>;
   updateMetadata: (submissionId: string, metadata: Partial<SubmissionMetadata>) => Promise<void>;
   completeSubmission: (submissionId: string) => Promise<void>;
+  syncSubmissions: () => Promise<{syncedCount: number; failedCount: number; errors: any[]}>;
   clearCurrentSubmission: () => void;
   clearError: () => void;
 }
@@ -27,16 +37,23 @@ type SubmissionsStore = SubmissionsState & SubmissionsActions;
 
 // Initialize dependencies
 const submissionRepository = new SQLiteSubmissionRepository();
+const fileRepository = new SQLiteFileRepository();
 const createSubmissionUseCase = new CreateSubmissionUseCase(submissionRepository);
 const updateSubmissionUseCase = new UpdateSubmissionUseCase(submissionRepository);
 const updateSubmissionMetadataUseCase = new UpdateSubmissionMetadataUseCase(submissionRepository);
 const completeSubmissionUseCase = new CompleteSubmissionUseCase(submissionRepository);
 const getSubmissionUseCase = new GetSubmissionUseCase(submissionRepository);
+const getAllSubmissionsUseCase = new GetAllSubmissionsUseCase(submissionRepository);
+const getCompletedSubmissionsUseCase = new GetCompletedSubmissionsUseCase(submissionRepository);
+const syncSubmissionsUseCase = new SyncSubmissionsUseCase(submissionRepository, fileRepository);
 
 export const useSubmissionsStore = create<SubmissionsStore>((set, get) => ({
   // Initial state
   currentSubmission: null,
+  submissions: [],
+  completedSubmissions: [],
   isLoading: false,
+  isSyncing: false,
   error: null,
 
   // Actions
@@ -134,6 +151,64 @@ export const useSubmissionsStore = create<SubmissionsStore>((set, get) => ({
       set({
         isLoading: false,
         error: error.message || 'Failed to complete submission',
+      });
+      throw error;
+    }
+  },
+
+  loadAllSubmissions: async () => {
+    set({isLoading: true, error: null});
+    try {
+      const submissions = await getAllSubmissionsUseCase.execute();
+      set({
+        submissions,
+        isLoading: false,
+        error: null,
+      });
+    } catch (error: any) {
+      set({
+        isLoading: false,
+        error: error.message || 'Failed to load submissions',
+      });
+      throw error;
+    }
+  },
+
+  loadCompletedSubmissions: async () => {
+    set({isLoading: true, error: null});
+    try {
+      const completedSubmissions = await getCompletedSubmissionsUseCase.execute();
+      set({
+        completedSubmissions,
+        isLoading: false,
+        error: null,
+      });
+    } catch (error: any) {
+      set({
+        isLoading: false,
+        error: error.message || 'Failed to load completed submissions',
+      });
+      throw error;
+    }
+  },
+
+  syncSubmissions: async () => {
+    set({isSyncing: true, error: null});
+    try {
+      console.log('[SubmissionsStore] Starting sync...');
+      const result = await syncSubmissionsUseCase.execute();
+
+      // Reload completed submissions to reflect updated sync status
+      await get().loadCompletedSubmissions();
+
+      set({isSyncing: false, error: null});
+      console.log('[SubmissionsStore] Sync completed:', result);
+
+      return result;
+    } catch (error: any) {
+      set({
+        isSyncing: false,
+        error: error.message || 'Failed to sync submissions',
       });
       throw error;
     }
