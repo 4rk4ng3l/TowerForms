@@ -9,6 +9,8 @@ export type FormMetadataSchema = {
   [key: string]: FormMetadataField;
 };
 
+export type SiteType = 'GREENFIELD' | 'ROOFTOP' | 'POSTEVIA';
+
 export interface FormStep {
   id: string;
   stepNumber: number;
@@ -33,6 +35,8 @@ export interface Form {
   id: string;
   name: string;
   description: string | null;
+  siteId: string | null;
+  siteType: SiteType;
   version: number;
   metadataSchema: FormMetadataSchema | null;
   steps: FormStep[];

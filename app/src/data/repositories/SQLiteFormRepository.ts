@@ -1,5 +1,5 @@
 import {IFormRepository} from '@core/repositories/IFormRepository';
-import {Form, FormStep, Question} from '@core/entities/Form';
+import {Form, FormStep, Question, SiteType} from '@core/entities/Form';
 import {Database} from '@infrastructure/database/database';
 
 export class SQLiteFormRepository implements IFormRepository {
@@ -41,14 +41,16 @@ export class SQLiteFormRepository implements IFormRepository {
     await this.db.transaction(async tx => {
       // Insert or replace form
       const formSql = `
-        INSERT OR REPLACE INTO forms (id, name, description, version, metadata_schema, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO forms (id, name, description, site_id, site_type, version, metadata_schema, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       await tx.executeSql(formSql, [
         form.id,
         form.name,
         form.description,
+        form.siteId,
+        form.siteType,
         form.version,
         form.metadataSchema ? JSON.stringify(form.metadataSchema) : null,
         form.createdAt.toISOString(),
@@ -181,6 +183,8 @@ export class SQLiteFormRepository implements IFormRepository {
       id: row.id,
       name: row.name,
       description: row.description,
+      siteId: row.site_id,
+      siteType: (row.site_type as SiteType) || 'GREENFIELD',
       version: row.version,
       metadataSchema: row.metadata_schema ? JSON.parse(row.metadata_schema) : null,
       steps,

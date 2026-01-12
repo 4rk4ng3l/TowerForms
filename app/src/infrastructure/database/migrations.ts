@@ -7,7 +7,7 @@ interface Migration {
 }
 
 const MIGRATIONS_TABLE = 'migrations';
-const CURRENT_VERSION = 4;
+const CURRENT_VERSION = 5;
 
 const migrations: Migration[] = [
   {
@@ -402,6 +402,23 @@ const migrations: Migration[] = [
 
       console.log('[Migration] Files table updated successfully');
       console.log('[Migration] Migration v4 completed successfully');
+    },
+  },
+  {
+    version: 5,
+    name: 'add_site_fields_to_forms',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      console.log('[Migration] Running migration v5: add_site_fields_to_forms');
+
+      // Add site_id column to forms table
+      await db.runAsync('ALTER TABLE forms ADD COLUMN site_id TEXT');
+      console.log('[Migration] Added site_id column to forms table');
+
+      // Add site_type column to forms table with default value
+      await db.runAsync("ALTER TABLE forms ADD COLUMN site_type TEXT NOT NULL DEFAULT 'GREENFIELD'");
+      console.log('[Migration] Added site_type column to forms table');
+
+      console.log('[Migration] Migration v5 completed successfully');
     },
   },
 ];

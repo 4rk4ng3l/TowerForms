@@ -43,6 +43,8 @@ export class SyncFormsUseCase {
       id: data.id,
       name: data.name,
       description: data.description || null,
+      siteId: data.siteId || null,
+      siteType: data.siteType || 'GREENFIELD',
       version: data.version || 1,
       metadataSchema: data.metadataSchema || null,
       steps: (data.steps || []).map((step: any) => ({
