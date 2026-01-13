@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import {useAuthStore} from '@store/auth/authStore';
+import {API_CONFIG} from '@data/api/config';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -100,8 +101,12 @@ export default function LoginScreen() {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Versión 1.0.0
+          <Text style={styles.footerText}>Versión 1.0.0</Text>
+          <Text style={[styles.footerText, {marginTop: 4, fontSize: 10}]}>
+            Servidor: {API_CONFIG.BASE_URL}
+          </Text>
+          <Text style={[styles.footerText, {marginTop: 2, fontSize: 10}]}>
+            {__DEV__ ? '(Desarrollo)' : '(Producción)'}
           </Text>
         </View>
       </View>

@@ -176,12 +176,24 @@ export class ApiClient {
     accessToken: string;
     refreshToken: string;
   }> {
-    const response = await this.client.post(API_ENDPOINTS.LOGIN, {
-      email,
-      password,
-    });
+    try {
+      console.log('[ApiClient] Attempting login to:', this.client.defaults.baseURL);
+      const response = await this.client.post(API_ENDPOINTS.LOGIN, {
+        email,
+        password,
+      });
 
-    return response.data.data;
+      console.log('[ApiClient] Login response status:', response.status);
+      return response.data.data;
+    } catch (error: any) {
+      console.error('[ApiClient] Login error:', {
+        message: error.message,
+        code: error.code,
+        url: error.config?.url,
+        baseURL: error.config?.baseURL,
+      });
+      throw error;
+    }
   }
 
   async logout(): Promise<void> {

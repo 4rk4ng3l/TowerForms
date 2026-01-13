@@ -179,6 +179,12 @@ export class SQLiteFormRepository implements IFormRepository {
   }
 
   private mapRowToForm(row: any, steps: FormStep[]): Form {
+    console.log(`[SQLiteFormRepository] Mapping row to form ${row.id}:`, {
+      metadata_schema: row.metadata_schema,
+      site_id: row.site_id,
+      site_type: row.site_type
+    });
+
     return {
       id: row.id,
       name: row.name,

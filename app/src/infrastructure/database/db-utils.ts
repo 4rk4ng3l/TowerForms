@@ -47,7 +47,7 @@ export const DatabaseUtils = {
       await db.executeSql('DELETE FROM answers');
       await db.executeSql('DELETE FROM submissions');
       await db.executeSql('DELETE FROM questions');
-      await db.executeSql('DELETE FROM steps');
+      await db.executeSql('DELETE FROM form_steps');
       await db.executeSql('DELETE FROM forms');
 
       console.log('[DatabaseUtils] Successfully cleared all data');

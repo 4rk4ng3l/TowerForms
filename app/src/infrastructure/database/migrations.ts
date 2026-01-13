@@ -229,20 +229,20 @@ const migrations: Migration[] = [
       console.log('[Migration] Migration v2 completed successfully');
     },
   },
+  // {
+  //   version: 3,
+  //   name: 'add_form_metadata_schema',
+  //   up: async (db: SQLite.SQLiteDatabase) => {
+  //     console.log('[Migration] Running migration v3: add_form_metadata_schema');
+
+  //     // Add metadata_schema column to forms table using runAsync
+  //     await db.runAsync('ALTER TABLE forms ADD COLUMN metadata_schema TEXT');
+
+  //     console.log('[Migration] Migration v3 completed successfully');
+  //   },
+  // },
   {
     version: 3,
-    name: 'add_form_metadata_schema',
-    up: async (db: SQLite.SQLiteDatabase) => {
-      console.log('[Migration] Running migration v3: add_form_metadata_schema');
-
-      // Add metadata_schema column to forms table using runAsync
-      await db.runAsync('ALTER TABLE forms ADD COLUMN metadata_schema TEXT');
-
-      console.log('[Migration] Migration v3 completed successfully');
-    },
-  },
-  {
-    version: 4,
     name: 'update_sync_model',
     up: async (db: SQLite.SQLiteDatabase) => {
       console.log('[Migration] Running migration v4: update_sync_model');
@@ -405,7 +405,7 @@ const migrations: Migration[] = [
     },
   },
   {
-    version: 5,
+    version: 4,
     name: 'add_site_fields_to_forms',
     up: async (db: SQLite.SQLiteDatabase) => {
       console.log('[Migration] Running migration v5: add_site_fields_to_forms');
