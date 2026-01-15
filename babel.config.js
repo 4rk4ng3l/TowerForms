@@ -14,6 +14,7 @@ module.exports = function (api) {
             '@infrastructure': './app/src/infrastructure',
             '@presentation': './app/src/presentation',
             '@store': './app/src/store',
+            '@shared': './app/src/shared',
           },
         },
       ],

@@ -1,6 +1,7 @@
 import {ISubmissionRepository} from '@core/repositories/ISubmissionRepository';
 import {SubmissionEntity, Answer, SyncStatus} from '@core/entities/Submission';
 import {database} from '@infrastructure/database/database';
+import {generateUUID} from '@shared/utils/idGenerator';
 
 export class SQLiteSubmissionRepository implements ISubmissionRepository {
   async create(submission: SubmissionEntity): Promise<void> {
@@ -159,7 +160,7 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
       await db.executeSql(
         'INSERT INTO answers (id, submission_id, question_id, value) VALUES (?, ?, ?, ?)',
         [
-          `${submissionId}-${answer.questionId}`,
+          generateUUID(), // Generate UUID for answer ID
           submissionId,
           answer.questionId,
           JSON.stringify(answer.value),
@@ -264,7 +265,7 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
     await tx.executeSql(
       'INSERT INTO answers (id, submission_id, question_id, value) VALUES (?, ?, ?, ?)',
       [
-        `${submissionId}-${answer.questionId}`,
+        generateUUID(), // Generate UUID for answer ID
         submissionId,
         answer.questionId,
         JSON.stringify(answer.value),

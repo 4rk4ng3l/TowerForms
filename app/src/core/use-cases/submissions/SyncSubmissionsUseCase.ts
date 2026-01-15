@@ -3,6 +3,7 @@ import {FileEntity} from '@core/entities/File';
 import {ISubmissionRepository} from '@core/repositories/ISubmissionRepository';
 import {IFileRepository} from '@core/repositories/IFileRepository';
 import {apiClient} from '@data/api/apiClient';
+import {generateUUID} from '@shared/utils/idGenerator';
 import * as FileSystem from 'expo-file-system';
 
 interface SyncResult {
@@ -60,8 +61,14 @@ export class SyncSubmissionsUseCase {
       );
 
       if (unsyncedSubmissions.length === 0) {
+        console.log('[SyncSubmissionsUseCase] No unsynced submissions found. Exiting.');
         return result;
       }
+
+      console.log(
+        '[SyncSubmissionsUseCase] Unsynced submission IDs:',
+        unsyncedSubmissions.map(s => s.id),
+      );
 
       // Mark submissions as syncing
       for (const submission of unsyncedSubmissions) {
@@ -112,6 +119,15 @@ export class SyncSubmissionsUseCase {
         try {
           console.log(
             `[SyncSubmissionsUseCase] Syncing ${submissionDtos.length} submissions to backend...`,
+          );
+          console.log(
+            '[SyncSubmissionsUseCase] Submission DTOs summary:',
+            submissionDtos.map(dto => ({
+              id: dto.id,
+              formId: dto.formId,
+              answerCount: dto.answers.length,
+              fileCount: dto.files.length,
+            })),
           );
 
           const syncResponse = await apiClient.syncSubmissions(submissionDtos);
@@ -187,7 +203,8 @@ export class SyncSubmissionsUseCase {
 
     // Map answers to backend format
     const answerDtos = submission.answers.map((answer, index) => {
-      const answerId = `${submission.id}-${answer.questionId}`;
+      // Generate a UUID for the answer
+      const answerId = generateUUID();
 
       // Determine if answer is text or multiple choice
       if (Array.isArray(answer.value)) {
@@ -248,7 +265,7 @@ export class SyncSubmissionsUseCase {
       if (!fileInfo.isDirectory) {
         // Read file as base64
         const base64Data = await FileSystem.readAsStringAsync(file.localPath, {
-          encoding: FileSystem.EncodingType.Base64,
+          encoding: 'base64',
         });
 
         console.log(

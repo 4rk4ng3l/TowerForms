@@ -4,10 +4,10 @@ export const API_CONFIG = {
   // For Android emulator: http://10.0.2.2:3000/api
   // For iOS simulator: http://localhost:3000/api
   // For physical device: http://YOUR_IP:3000/api
-  // BASE_URL: __DEV__
-  //   ? 'http://10.0.2.2:3000/api' // Android emulator - use localhost for iOS/Web
-  //   : 'http://3.208.180.76:3000/api', // Production - EC2 Server
-  BASE_URL: 'http://3.208.180.76:3000/api',
+  BASE_URL: __DEV__
+    ? 'http://10.0.2.2:3000/api' // Android emulator - use localhost for iOS/Web
+    : 'http://3.208.180.76:3000/api', // Production - EC2 Server
+  // BASE_URL: 'http://3.208.180.76:3000/api',
 
   TIMEOUT: 120000, // 120 seconds (2 minutes) for sync operations with large files
   RETRY_ATTEMPTS: 3,

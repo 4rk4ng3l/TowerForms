@@ -37,7 +37,10 @@ export default function DownloadsScreen() {
 
   const handleSync = async () => {
     try {
+      console.log('[Downloads] Starting sync process...');
       const unsyncedCount = completedSubmissions.filter(s => s.syncStatus === 'pending' || s.syncStatus === 'failed').length;
+
+      console.log('[Downloads] Unsynced submissions:', unsyncedCount);
 
       if (unsyncedCount === 0) {
         Alert.alert('Información', 'No hay formularios pendientes de sincronizar');
@@ -53,12 +56,19 @@ export default function DownloadsScreen() {
             text: 'Sincronizar',
             onPress: async () => {
               try {
+                console.log('[Downloads] User confirmed, calling syncSubmissions...');
                 const result = await syncSubmissions();
 
+                console.log('[Downloads] Sync result:', result);
+
                 if (result.failedCount > 0) {
+                  const errorDetails = result.errors && result.errors.length > 0
+                    ? `\n\nErrores:\n${result.errors.map((e: any) => `- ${e.error || e.message || 'Unknown error'}`).join('\n')}`
+                    : '';
+
                   Alert.alert(
                     'Sincronización Parcial',
-                    `Sincronizados: ${result.syncedCount}\nFallidos: ${result.failedCount}\n\nVerifica tu conexión e intenta nuevamente.`
+                    `Sincronizados: ${result.syncedCount}\nFallidos: ${result.failedCount}${errorDetails}\n\nVerifica tu conexión e intenta nuevamente.`
                   );
                 } else {
                   Alert.alert(
@@ -67,9 +77,17 @@ export default function DownloadsScreen() {
                   );
                 }
               } catch (error: any) {
+                console.error('[Downloads] Sync error:', error);
+                console.error('[Downloads] Error stack:', error.stack);
+                console.error('[Downloads] Error response:', error.response?.data);
+
+                const errorMessage = error.response?.data?.error?.message
+                  || error.message
+                  || 'No se pudo sincronizar. Verifica tu conexión e intenta nuevamente.';
+
                 Alert.alert(
-                  'Error',
-                  error.message || 'No se pudo sincronizar. Verifica tu conexión e intenta nuevamente.'
+                  'Error de Sincronización',
+                  errorMessage
                 );
               }
             }
@@ -77,6 +95,7 @@ export default function DownloadsScreen() {
         ]
       );
     } catch (error: any) {
+      console.error('[Downloads] Error preparing sync:', error);
       Alert.alert('Error', error.message || 'Error al preparar sincronización');
     }
   };
@@ -235,34 +254,30 @@ export default function DownloadsScreen() {
     >
       {/* Header */}
       <ThemedView style={styles.header}>
-        <ThemedView style={styles.headerContent}>
-          <ThemedView>
-            <ThemedText type="title" style={styles.headerTitle}>
-              Descargas
-            </ThemedText>
-            <ThemedText style={styles.subtitle}>
-              Exporta tus formularios completados en Excel y descarga las imágenes por step
-            </ThemedText>
-          </ThemedView>
-          <TouchableOpacity
-            style={[
-              styles.syncButton,
-              { backgroundColor: '#007AFF' },
-              isSyncing && styles.syncButtonDisabled
-            ]}
-            onPress={handleSync}
-            disabled={isSyncing}
-          >
-            <Ionicons
-              name={isSyncing ? "sync-outline" : "cloud-upload-outline"}
-              size={20}
-              color="#fff"
-            />
-            <ThemedText style={styles.syncButtonText}>
-              {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
-            </ThemedText>
-          </TouchableOpacity>
-        </ThemedView>
+        <ThemedText type="title" style={styles.headerTitle}>
+          Descargas
+        </ThemedText>
+        <ThemedText style={styles.subtitle}>
+          Exporta tus formularios completados en Excel y descarga las imágenes por step
+        </ThemedText>
+        <TouchableOpacity
+          style={[
+            styles.syncButton,
+            { backgroundColor: '#007AFF' },
+            isSyncing && styles.syncButtonDisabled
+          ]}
+          onPress={handleSync}
+          disabled={isSyncing}
+        >
+          <Ionicons
+            name={isSyncing ? "sync-outline" : "cloud-upload-outline"}
+            size={20}
+            color="#fff"
+          />
+          <ThemedText style={styles.syncButtonText}>
+            {isSyncing ? 'Sincronizando...' : 'Sincronizar'}
+          </ThemedText>
+        </TouchableOpacity>
       </ThemedView>
 
       {/* Statistics */}
@@ -440,12 +455,6 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingTop: 60,
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 12,
-  },
   headerTitle: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -459,10 +468,12 @@ const styles = StyleSheet.create({
   syncButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 6,
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+    marginTop: 16,
     shadowColor: '#007AFF',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,

@@ -1,0 +1,14 @@
+{
+  "tipoSitio": {
+    "type": "select",
+    "label": "Tipo de Sitio",
+    "options": ["Greenfield", "Rooftop", "Monopolo", "Autosoportada"],
+    "required": true
+  },
+  "ubicacion": { "type": "text", "label": "Ubicación", "required": true },
+  "nombreTecnico": {
+    "type": "text",
+    "label": "Nombre del Técnico",
+    "required": true
+  }
+}

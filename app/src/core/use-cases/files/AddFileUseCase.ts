@@ -1,5 +1,6 @@
 import {FileEntity} from '@core/entities/File';
 import {IFileRepository} from '@core/repositories/IFileRepository';
+import {generateUUID} from '@shared/utils/idGenerator';
 
 export class AddFileUseCase {
   constructor(private fileRepository: IFileRepository) {}
@@ -16,8 +17,8 @@ export class AddFileUseCase {
     try {
       console.log('[AddFileUseCase] Adding file:', fileName);
 
-      // Generate unique ID
-      const fileId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Generate unique UUID
+      const fileId = generateUUID();
 
       // Create file entity
       const file = FileEntity.create(

@@ -264,10 +264,32 @@ export class ApiClient {
     errors: any[];
     hasErrors: boolean;
   }> {
-    const response = await this.client.post(API_ENDPOINTS.SYNC, {
-      submissions,
+    console.log('[ApiClient] Syncing submissions...', {
+      count: submissions.length,
+      endpoint: API_ENDPOINTS.SYNC,
+      baseURL: this.client.defaults.baseURL,
     });
-    return response.data.data;
+
+    try {
+      const response = await this.client.post(API_ENDPOINTS.SYNC, {
+        submissions,
+      });
+
+      console.log('[ApiClient] Sync response received:', {
+        status: response.status,
+        data: response.data,
+      });
+
+      return response.data.data;
+    } catch (error: any) {
+      console.error('[ApiClient] Sync failed:', {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+        data: error.response?.data,
+      });
+      throw error;
+    }
   }
 
   async getPendingData(params?: {

@@ -1,5 +1,6 @@
 import {SubmissionEntity, SubmissionMetadata} from '@core/entities/Submission';
 import {ISubmissionRepository} from '@core/repositories/ISubmissionRepository';
+import {generateUUID} from '@shared/utils/idGenerator';
 
 export class CreateSubmissionUseCase {
   constructor(private submissionRepository: ISubmissionRepository) {}
@@ -12,8 +13,8 @@ export class CreateSubmissionUseCase {
     try {
       console.log('[CreateSubmissionUseCase] Creating submission for form:', formId);
 
-      // Generate unique ID
-      const submissionId = `submission-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      // Generate unique UUID
+      const submissionId = generateUUID();
 
       // Create submission entity
       const submission = SubmissionEntity.create(
