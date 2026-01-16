@@ -8,6 +8,7 @@ import {GetSubmissionUseCase} from '@core/use-cases/submissions/GetSubmissionUse
 import {GetAllSubmissionsUseCase} from '@core/use-cases/submissions/GetAllSubmissionsUseCase';
 import {GetCompletedSubmissionsUseCase} from '@core/use-cases/submissions/GetCompletedSubmissionsUseCase';
 import {SyncSubmissionsUseCase} from '@core/use-cases/submissions/SyncSubmissionsUseCase';
+import {FetchRemoteSubmissionsUseCase} from '@core/use-cases/submissions/FetchRemoteSubmissionsUseCase';
 import {SQLiteSubmissionRepository} from '@data/repositories/SQLiteSubmissionRepository';
 import {SQLiteFileRepository} from '@data/repositories/SQLiteFileRepository';
 
@@ -29,6 +30,7 @@ interface SubmissionsActions {
   updateMetadata: (submissionId: string, metadata: Partial<SubmissionMetadata>) => Promise<void>;
   completeSubmission: (submissionId: string) => Promise<void>;
   syncSubmissions: () => Promise<{syncedCount: number; failedCount: number; errors: any[]}>;
+  fetchRemoteSubmissions: () => Promise<{fetchedCount: number; updatedCount: number; errors: any[]}>;
   clearCurrentSubmission: () => void;
   clearError: () => void;
 }
@@ -46,6 +48,7 @@ const getSubmissionUseCase = new GetSubmissionUseCase(submissionRepository);
 const getAllSubmissionsUseCase = new GetAllSubmissionsUseCase(submissionRepository);
 const getCompletedSubmissionsUseCase = new GetCompletedSubmissionsUseCase(submissionRepository);
 const syncSubmissionsUseCase = new SyncSubmissionsUseCase(submissionRepository, fileRepository);
+const fetchRemoteSubmissionsUseCase = new FetchRemoteSubmissionsUseCase(submissionRepository);
 
 export const useSubmissionsStore = create<SubmissionsStore>((set, get) => ({
   // Initial state
@@ -209,6 +212,28 @@ export const useSubmissionsStore = create<SubmissionsStore>((set, get) => ({
       set({
         isSyncing: false,
         error: error.message || 'Failed to sync submissions',
+      });
+      throw error;
+    }
+  },
+
+  fetchRemoteSubmissions: async () => {
+    set({isSyncing: true, error: null});
+    try {
+      console.log('[SubmissionsStore] Fetching remote submissions...');
+      const result = await fetchRemoteSubmissionsUseCase.execute();
+
+      // Reload completed submissions to show fetched submissions
+      await get().loadCompletedSubmissions();
+
+      set({isSyncing: false, error: null});
+      console.log('[SubmissionsStore] Fetch completed:', result);
+
+      return result;
+    } catch (error: any) {
+      set({
+        isSyncing: false,
+        error: error.message || 'Failed to fetch remote submissions',
       });
       throw error;
     }

@@ -4,7 +4,7 @@ import {ISubmissionRepository} from '@core/repositories/ISubmissionRepository';
 import {IFileRepository} from '@core/repositories/IFileRepository';
 import {apiClient} from '@data/api/apiClient';
 import {generateUUID} from '@shared/utils/idGenerator';
-import * as FileSystem from 'expo-file-system';
+import { File } from 'expo-file-system/next';
 
 interface SyncResult {
   syncedCount: number;
@@ -196,10 +196,15 @@ export class SyncSubmissionsUseCase {
     // Load files for this submission
     const files = await this.fileRepository.findBySubmissionId(submission.id);
 
+    console.log(`[SyncSubmissionsUseCase] Found ${files.length} files for submission ${submission.id}`);
+    console.log('[SyncSubmissionsUseCase] Files:', files.map(f => ({ id: f.id, fileName: f.fileName, localPath: f.localPath })));
+
     // Convert files to base64
     const fileDtos = await Promise.all(
       files.map(file => this.mapFileToDto(file)),
     );
+
+    console.log(`[SyncSubmissionsUseCase] Converted ${fileDtos.length} files to DTOs`);
 
     // Map answers to backend format
     const answerDtos = submission.answers.map((answer, index) => {
@@ -255,35 +260,32 @@ export class SyncSubmissionsUseCase {
     }
 
     try {
-      // Check if file exists before attempting to read
-      const fileInfo = await FileSystem.getInfoAsync(file.localPath);
+      // Use new expo-file-system API
+      const fileRef = new File(file.localPath);
 
-      if (!fileInfo.exists) {
+      console.log(`[SyncSubmissionsUseCase] Reading file: ${file.localPath}`);
+      console.log(`[SyncSubmissionsUseCase] File exists: ${fileRef.exists}`);
+
+      if (!fileRef.exists) {
         throw new Error(`File not found at path: ${file.localPath}`);
       }
 
-      if (!fileInfo.isDirectory) {
-        // Read file as base64
-        const base64Data = await FileSystem.readAsStringAsync(file.localPath, {
-          encoding: 'base64',
-        });
+      // Read file as base64
+      const base64Data = await fileRef.base64();
 
-        console.log(
-          `[SyncSubmissionsUseCase] Successfully read file ${file.fileName} (${(base64Data.length / 1024).toFixed(2)} KB base64)`,
-        );
+      console.log(
+        `[SyncSubmissionsUseCase] Successfully read file ${file.fileName} (${(base64Data.length / 1024).toFixed(2)} KB base64)`,
+      );
 
-        return {
-          id: file.id,
-          stepId: file.stepId,
-          questionId: file.questionId || undefined,
-          fileName: file.fileName,
-          fileData: base64Data,
-          mimeType: file.mimeType,
-          fileSize: file.fileSize,
-        };
-      } else {
-        throw new Error(`Path is a directory, not a file: ${file.localPath}`);
-      }
+      return {
+        id: file.id,
+        stepId: file.stepId,
+        questionId: file.questionId || undefined,
+        fileName: file.fileName,
+        fileData: base64Data,
+        mimeType: file.mimeType,
+        fileSize: file.fileSize,
+      };
     } catch (error: any) {
       console.error(
         `[SyncSubmissionsUseCase] Error reading file ${file.id} (${file.fileName}):`,

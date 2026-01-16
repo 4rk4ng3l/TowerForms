@@ -213,10 +213,18 @@ export default function FillSubmissionScreen() {
   };
 
   const handleTakePhoto = async (questionId: string) => {
-    if (!currentSubmission || !form || currentStepIndex === -1) return;
+    console.log('[FillSubmission] handleTakePhoto called', { questionId, currentSubmission: currentSubmission?.id, form: form?.id, currentStepIndex });
+
+    if (!currentSubmission || !form || currentStepIndex === -1) {
+      console.log('[FillSubmission] Early return - missing data');
+      return;
+    }
 
     const hasPermission = await requestCameraPermission();
-    if (!hasPermission) return;
+    if (!hasPermission) {
+      console.log('[FillSubmission] No camera permission');
+      return;
+    }
 
     try {
       const result = await ImagePicker.launchCameraAsync({
@@ -225,10 +233,21 @@ export default function FillSubmissionScreen() {
         quality: 0.8,
       });
 
+      console.log('[FillSubmission] Camera result:', { canceled: result.canceled, hasAssets: result.assets?.length > 0 });
+
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
         const fileName = `photo_${Date.now()}.jpg`;
         const currentStep = form.steps[currentStepIndex];
+
+        console.log('[FillSubmission] Adding file:', {
+          submissionId: currentSubmission.id,
+          stepId: currentStep.id,
+          questionId,
+          uri: asset.uri,
+          fileName,
+          fileSize: asset.fileSize,
+        });
 
         await addFile(
           currentSubmission.id,
@@ -240,11 +259,13 @@ export default function FillSubmissionScreen() {
           asset.fileSize || 0,
         );
 
+        console.log('[FillSubmission] File added successfully');
+
         // Reload files for this question
         await loadFilesForQuestion(currentSubmission.id, questionId);
       }
     } catch (error) {
-      console.error('Error taking photo:', error);
+      console.error('[FillSubmission] Error taking photo:', error);
       Alert.alert('Error', 'No se pudo tomar la foto');
     }
   };

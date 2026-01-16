@@ -46,10 +46,18 @@ export class SQLiteFileRepository implements IFileRepository {
   async findBySubmissionId(submissionId: string): Promise<FileEntity[]> {
     const db = database;
 
+    console.log(`[SQLiteFileRepository] Finding files for submissionId: ${submissionId}`);
+
     const result = await db.executeSql(
       'SELECT * FROM files WHERE submission_id = ? ORDER BY created_at DESC',
       [submissionId],
     );
+
+    console.log(`[SQLiteFileRepository] Found ${result.rows.length} files`);
+
+    // Debug: mostrar todos los archivos en la BD
+    const allFiles = await db.executeSql('SELECT id, submission_id, file_name FROM files');
+    console.log('[SQLiteFileRepository] All files in DB:', allFiles.rows._array);
 
     return result.rows._array.map(row => this.mapRowToEntity(row));
   }
