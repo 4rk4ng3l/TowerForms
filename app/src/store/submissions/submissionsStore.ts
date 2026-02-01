@@ -12,12 +12,28 @@ import {FetchRemoteSubmissionsUseCase} from '@core/use-cases/submissions/FetchRe
 import {SQLiteSubmissionRepository} from '@data/repositories/SQLiteSubmissionRepository';
 import {SQLiteFileRepository} from '@data/repositories/SQLiteFileRepository';
 
+interface SyncProgress {
+  phase: 'idle' | 'submissions' | 'files';
+  current: number;
+  total: number;
+  currentItem: string;
+}
+
+interface SyncResult {
+  syncedCount: number;
+  failedCount: number;
+  filesUploaded: number;
+  filesFailed: number;
+  errors: any[];
+}
+
 interface SubmissionsState {
   currentSubmission: SubmissionEntity | null;
   submissions: SubmissionEntity[];
   completedSubmissions: SubmissionEntity[];
   isLoading: boolean;
   isSyncing: boolean;
+  syncProgress: SyncProgress;
   error: string | null;
 }
 
@@ -29,7 +45,7 @@ interface SubmissionsActions {
   updateAnswer: (submissionId: string, answer: Answer) => Promise<void>;
   updateMetadata: (submissionId: string, metadata: Partial<SubmissionMetadata>) => Promise<void>;
   completeSubmission: (submissionId: string) => Promise<void>;
-  syncSubmissions: () => Promise<{syncedCount: number; failedCount: number; errors: any[]}>;
+  syncSubmissions: () => Promise<SyncResult>;
   fetchRemoteSubmissions: () => Promise<{fetchedCount: number; updatedCount: number; errors: any[]}>;
   clearCurrentSubmission: () => void;
   clearError: () => void;
@@ -57,6 +73,12 @@ export const useSubmissionsStore = create<SubmissionsStore>((set, get) => ({
   completedSubmissions: [],
   isLoading: false,
   isSyncing: false,
+  syncProgress: {
+    phase: 'idle',
+    current: 0,
+    total: 0,
+    currentItem: '',
+  },
   error: null,
 
   // Actions
@@ -196,15 +218,45 @@ export const useSubmissionsStore = create<SubmissionsStore>((set, get) => ({
   },
 
   syncSubmissions: async () => {
-    set({isSyncing: true, error: null});
+    set({
+      isSyncing: true,
+      error: null,
+      syncProgress: {phase: 'submissions', current: 0, total: 0, currentItem: ''},
+    });
     try {
       console.log('[SubmissionsStore] Starting sync...');
-      const result = await syncSubmissionsUseCase.execute();
+
+      const result = await syncSubmissionsUseCase.execute({
+        onSubmissionProgress: (current, total, submissionId) => {
+          set({
+            syncProgress: {
+              phase: 'submissions',
+              current,
+              total,
+              currentItem: submissionId,
+            },
+          });
+        },
+        onFileProgress: (current, total, fileName) => {
+          set({
+            syncProgress: {
+              phase: 'files',
+              current,
+              total,
+              currentItem: fileName,
+            },
+          });
+        },
+      });
 
       // Reload completed submissions to reflect updated sync status
       await get().loadCompletedSubmissions();
 
-      set({isSyncing: false, error: null});
+      set({
+        isSyncing: false,
+        error: null,
+        syncProgress: {phase: 'idle', current: 0, total: 0, currentItem: ''},
+      });
       console.log('[SubmissionsStore] Sync completed:', result);
 
       return result;
@@ -212,6 +264,7 @@ export const useSubmissionsStore = create<SubmissionsStore>((set, get) => ({
       set({
         isSyncing: false,
         error: error.message || 'Failed to sync submissions',
+        syncProgress: {phase: 'idle', current: 0, total: 0, currentItem: ''},
       });
       throw error;
     }

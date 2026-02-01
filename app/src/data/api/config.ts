@@ -42,4 +42,14 @@ export const API_ENDPOINTS = {
   EXPORT_SUBMISSION_IMAGES: (id: string, stepNumber: number) =>
     `/export/submissions/${id}/images/step/${stepNumber}`,
   EXPORT_SUBMISSION_PACKAGE: (id: string) => `/export/submissions/${id}/package`,
+
+  // Sites
+  SITES: '/sites',
+  SITES_BY_TYPE: (type: string) => `/sites?type=${type}`,
+  SITE_BY_CODE: (codigo: string) => `/sites/${codigo}`,
+  SITE_INVENTORY: (codigo: string) => `/sites/${codigo}/inventory`,
+  SITE_INVENTORY_EE: (codigo: string) => `/sites/${codigo}/inventory/ee`,
+  SITE_INVENTORY_EP: (codigo: string) => `/sites/${codigo}/inventory/ep`,
+  INVENTORY_EE_BY_ID: (id: string) => `/sites/inventory/ee/${id}`,
+  INVENTORY_EP_BY_ID: (id: string) => `/sites/inventory/ep/${id}`,
 } as const;

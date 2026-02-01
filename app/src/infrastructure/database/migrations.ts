@@ -7,7 +7,7 @@ interface Migration {
 }
 
 const MIGRATIONS_TABLE = 'migrations';
-const CURRENT_VERSION = 5;
+const CURRENT_VERSION = 9;
 
 const migrations: Migration[] = [
   {
@@ -419,6 +419,166 @@ const migrations: Migration[] = [
       console.log('[Migration] Added site_type column to forms table');
 
       console.log('[Migration] Migration v5 completed successfully');
+    },
+  },
+  {
+    version: 5,
+    name: 'add_comment_to_answers',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      console.log('[Migration] Running migration v6: add_comment_to_answers');
+
+      // Add comment column to answers table
+      await db.runAsync('ALTER TABLE answers ADD COLUMN comment TEXT');
+      console.log('[Migration] Added comment column to answers table');
+
+      console.log('[Migration] Migration v6 completed successfully');
+    },
+  },
+  {
+    version: 6,
+    name: 'add_sites_and_inventory_tables',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      console.log('[Migration] Running migration v7: add_sites_and_inventory_tables');
+
+      // Sites table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS sites (
+          id TEXT PRIMARY KEY,
+          codigo_towernex TEXT NOT NULL UNIQUE,
+          codigo_sitio TEXT,
+          name TEXT NOT NULL,
+          site_type TEXT NOT NULL,
+          latitud REAL,
+          longitud REAL,
+          direccion TEXT,
+          regional TEXT,
+          contratista_om TEXT,
+          empresa_auditora TEXT,
+          tecnico_ea TEXT,
+          synced_at TEXT
+        );
+      `);
+      console.log('[Migration] Created sites table');
+
+      // Create indexes for sites
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_sites_codigo_towernex
+        ON sites(codigo_towernex);
+      `);
+
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_sites_site_type
+        ON sites(site_type);
+      `);
+
+      // Inventory EE table (Elementos en Estructura)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS inventory_ee (
+          id TEXT PRIMARY KEY,
+          site_id TEXT NOT NULL,
+          id_ee INTEGER NOT NULL,
+          tipo_soporte TEXT,
+          tipo_ee TEXT NOT NULL,
+          situacion TEXT NOT NULL DEFAULT 'En servicio',
+          modelo TEXT,
+          fabricante TEXT,
+          arista_cara_mastil TEXT,
+          operador_propietario TEXT,
+          altura_antena REAL,
+          azimut REAL,
+          epa_m2 REAL,
+          uso_compartido INTEGER NOT NULL DEFAULT 0,
+          observaciones TEXT,
+          FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+        );
+      `);
+      console.log('[Migration] Created inventory_ee table');
+
+      // Create indexes for inventory_ee
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_inventory_ee_site_id
+        ON inventory_ee(site_id);
+      `);
+
+      await db.execAsync(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_ee_site_id_ee
+        ON inventory_ee(site_id, id_ee);
+      `);
+
+      // Inventory EP table (Equipos en Piso)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS inventory_ep (
+          id TEXT PRIMARY KEY,
+          site_id TEXT NOT NULL,
+          id_ep INTEGER NOT NULL,
+          tipo_piso TEXT,
+          ubicacion_equipo TEXT,
+          situacion TEXT NOT NULL DEFAULT 'En servicio',
+          estado_piso TEXT,
+          modelo TEXT,
+          fabricante TEXT,
+          uso_ep TEXT,
+          operador_propietario TEXT,
+          ancho REAL,
+          profundidad REAL,
+          altura REAL,
+          superficie_ocupada REAL,
+          observaciones TEXT,
+          FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE
+        );
+      `);
+      console.log('[Migration] Created inventory_ep table');
+
+      // Create indexes for inventory_ep
+      await db.execAsync(`
+        CREATE INDEX IF NOT EXISTS idx_inventory_ep_site_id
+        ON inventory_ep(site_id);
+      `);
+
+      await db.execAsync(`
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_inventory_ep_site_id_ep
+        ON inventory_ep(site_id, id_ep);
+      `);
+
+      console.log('[Migration] Migration v7 completed successfully');
+    },
+  },
+  {
+    version: 7,
+    name: 'add_sections_to_forms',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      console.log('[Migration] Running migration v8: add_sections_to_forms');
+
+      // Add sections column to forms table
+      await db.runAsync('ALTER TABLE forms ADD COLUMN sections TEXT');
+      console.log('[Migration] Added sections column to forms table');
+
+      console.log('[Migration] Migration v8 completed successfully');
+    },
+  },
+  {
+    version: 8,
+    name: 'add_inventory_ee_fields',
+    up: async (db: SQLite.SQLiteDatabase) => {
+      console.log('[Migration] Running migration v9: add_inventory_ee_fields');
+
+      // Add new columns to inventory_ee table
+      await db.runAsync('ALTER TABLE inventory_ee ADD COLUMN diametro REAL');
+      console.log('[Migration] Added diametro column to inventory_ee table');
+
+      await db.runAsync('ALTER TABLE inventory_ee ADD COLUMN largo REAL');
+      console.log('[Migration] Added largo column to inventory_ee table');
+
+      await db.runAsync('ALTER TABLE inventory_ee ADD COLUMN ancho REAL');
+      console.log('[Migration] Added ancho column to inventory_ee table');
+
+      await db.runAsync('ALTER TABLE inventory_ee ADD COLUMN fondo REAL');
+      console.log('[Migration] Added fondo column to inventory_ee table');
+
+      await db.runAsync('ALTER TABLE inventory_ee ADD COLUMN sistema_movil TEXT');
+      console.log('[Migration] Added sistema_movil column to inventory_ee table');
+
+      console.log('[Migration] Migration v9 completed successfully');
     },
   },
 ];

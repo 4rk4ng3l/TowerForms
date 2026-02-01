@@ -11,12 +11,14 @@ import {
 } from 'react-native';
 import {useRouter} from 'expo-router';
 import {useFormsStore} from '@store/forms/formsStore';
+import {useSitesStore} from '@store/sites/sitesStore';
 import {Form} from '@core/entities/Form';
 
 export default function FormsListScreen() {
   const router = useRouter();
   const {forms, isLoading, isSyncing, error, loadForms, syncForms, clearError} =
     useFormsStore();
+  const {syncSites, isSyncing: isSyncingSites} = useSitesStore();
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
@@ -39,12 +41,16 @@ export default function FormsListScreen() {
   const handleSync = async () => {
     try {
       clearError();
-      await syncForms();
-      Alert.alert('Éxito', 'Formularios sincronizados correctamente');
+      // Sync forms and sites in parallel
+      await Promise.all([
+        syncForms(),
+        syncSites(),
+      ]);
+      Alert.alert('Éxito', 'Formularios y sitios sincronizados correctamente');
     } catch (error: any) {
       Alert.alert(
         'Error de Sincronización',
-        error.message || 'No se pudieron sincronizar los formularios',
+        error.message || 'No se pudieron sincronizar los datos',
       );
     }
   };

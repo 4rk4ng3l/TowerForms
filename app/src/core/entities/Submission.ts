@@ -3,6 +3,7 @@ export type SyncStatus = 'pending' | 'syncing' | 'synced' | 'failed';
 export interface Answer {
   questionId: string;
   value: string | string[] | number | null;
+  comment?: string | null;
   fileIds?: string[];
 }
 

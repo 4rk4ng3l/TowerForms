@@ -319,17 +319,122 @@ export class ApiClient {
   }
 
   // Files Methods
-  async uploadFile(file: {
+  /**
+   * Upload a single file using multipart/form-data
+   * More efficient than base64 for large files
+   */
+  async uploadFile(params: {
     submissionId: string;
     stepId: string;
     questionId?: string;
+    fileId: string;
+    localPath: string;
     fileName: string;
-    fileData: string; // base64
     mimeType: string;
-    fileSize: number;
-  }): Promise<any> {
-    const response = await this.client.post(API_ENDPOINTS.FILES_UPLOAD, file);
+  }): Promise<{id: string; fileName: string; fileSize: number; mimeType: string}> {
+    const formData = new FormData();
+
+    // Add file - React Native specific format
+    formData.append('file', {
+      uri: params.localPath,
+      type: params.mimeType,
+      name: params.fileName,
+    } as any);
+
+    // Add metadata
+    formData.append('submissionId', params.submissionId);
+    formData.append('stepId', params.stepId);
+    formData.append('fileId', params.fileId);
+    if (params.questionId) {
+      formData.append('questionId', params.questionId);
+    }
+
+    console.log('[ApiClient] Uploading file:', {
+      fileName: params.fileName,
+      submissionId: params.submissionId,
+    });
+
+    const response = await this.client.post(API_ENDPOINTS.FILES_UPLOAD, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      timeout: 300000, // 5 minutes per file (for large videos)
+    });
+
+    console.log('[ApiClient] File uploaded:', params.fileName);
     return response.data.data;
+  }
+
+  /**
+   * Upload files in batches with progress callback
+   * @param files Array of files to upload
+   * @param batchSize Number of files to upload concurrently (default: 5)
+   * @param onProgress Callback for progress updates
+   */
+  async uploadFilesInBatches(
+    files: Array<{
+      submissionId: string;
+      stepId: string;
+      questionId?: string;
+      fileId: string;
+      localPath: string;
+      fileName: string;
+      mimeType: string;
+    }>,
+    batchSize: number = 5,
+    onProgress?: (completed: number, total: number, currentFile: string) => void,
+  ): Promise<{
+    uploaded: number;
+    failed: number;
+    successIds: string[];
+    errors: Array<{fileId: string; fileName: string; error: string}>;
+  }> {
+    const result = {
+      uploaded: 0,
+      failed: 0,
+      successIds: [] as string[],
+      errors: [] as Array<{fileId: string; fileName: string; error: string}>,
+    };
+
+    const total = files.length;
+    console.log(`[ApiClient] Starting batch upload of ${total} files (batch size: ${batchSize})`);
+
+    // Process files in batches
+    for (let i = 0; i < files.length; i += batchSize) {
+      const batch = files.slice(i, i + batchSize);
+
+      // Upload batch concurrently
+      const batchResults = await Promise.allSettled(
+        batch.map(file => this.uploadFile(file)),
+      );
+
+      // Process results
+      batchResults.forEach((batchResult, index) => {
+        const file = batch[index];
+        if (batchResult.status === 'fulfilled') {
+          result.uploaded++;
+          result.successIds.push(file.fileId);
+        } else {
+          result.failed++;
+          result.errors.push({
+            fileId: file.fileId,
+            fileName: file.fileName,
+            error: batchResult.reason?.message || 'Upload failed',
+          });
+          console.error(`[ApiClient] Failed to upload ${file.fileName}:`, batchResult.reason);
+        }
+
+        // Report progress
+        if (onProgress) {
+          onProgress(result.uploaded + result.failed, total, file.fileName);
+        }
+      });
+
+      console.log(`[ApiClient] Batch complete: ${result.uploaded}/${total} uploaded, ${result.failed} failed`);
+    }
+
+    console.log('[ApiClient] Batch upload complete:', result);
+    return result;
   }
 
   // Export Methods
@@ -376,6 +481,161 @@ export class ApiClient {
       API_ENDPOINTS.EXPORT_SUBMISSION_PACKAGE(submissionId),
     );
     return response.data.data;
+  }
+
+  // Sites Methods
+  async getSites(type?: string): Promise<any[]> {
+    const url = type ? API_ENDPOINTS.SITES_BY_TYPE(type) : API_ENDPOINTS.SITES;
+    const response = await this.client.get(url);
+    return response.data.data;
+  }
+
+  async getSiteByCode(codigo: string): Promise<any> {
+    const response = await this.client.get(API_ENDPOINTS.SITE_BY_CODE(codigo));
+    return response.data.data;
+  }
+
+  async getSiteInventory(codigo: string): Promise<any> {
+    const response = await this.client.get(API_ENDPOINTS.SITE_INVENTORY(codigo));
+    return response.data.data;
+  }
+
+  async addInventoryEE(codigo: string, data: any): Promise<any> {
+    const response = await this.client.post(
+      API_ENDPOINTS.SITE_INVENTORY_EE(codigo),
+      data,
+    );
+    return response.data.data;
+  }
+
+  async addInventoryEP(codigo: string, data: any): Promise<any> {
+    const response = await this.client.post(
+      API_ENDPOINTS.SITE_INVENTORY_EP(codigo),
+      data,
+    );
+    return response.data.data;
+  }
+
+  async updateInventoryEE(id: string, data: any): Promise<any> {
+    const response = await this.client.put(
+      API_ENDPOINTS.INVENTORY_EE_BY_ID(id),
+      data,
+    );
+    return response.data.data;
+  }
+
+  async updateInventoryEP(id: string, data: any): Promise<any> {
+    const response = await this.client.put(
+      API_ENDPOINTS.INVENTORY_EP_BY_ID(id),
+      data,
+    );
+    return response.data.data;
+  }
+
+  /**
+   * Download a file from the server
+   * Returns the file as an ArrayBuffer for saving locally
+   */
+  async downloadFile(fileId: string): Promise<{
+    data: ArrayBuffer;
+    fileName: string;
+    mimeType: string;
+  }> {
+    console.log(`[ApiClient] Downloading file: ${fileId}`);
+
+    const response = await this.client.get(API_ENDPOINTS.FILE_DOWNLOAD(fileId), {
+      responseType: 'arraybuffer',
+      timeout: 300000, // 5 minutes for large files
+    });
+
+    // Extract filename from Content-Disposition header if available
+    const contentDisposition = response.headers['content-disposition'];
+    let fileName = `file_${fileId}`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        fileName = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+
+    const mimeType = response.headers['content-type'] || 'application/octet-stream';
+
+    console.log(`[ApiClient] File downloaded: ${fileName} (${mimeType})`);
+
+    return {
+      data: response.data,
+      fileName,
+      mimeType,
+    };
+  }
+
+  /**
+   * Download files in batches with progress callback
+   * @param fileIds Array of file IDs to download
+   * @param batchSize Number of files to download concurrently (default: 3)
+   * @param onProgress Callback for progress updates
+   */
+  async downloadFilesInBatches(
+    fileIds: string[],
+    batchSize: number = 3,
+    onProgress?: (completed: number, total: number, currentFileId: string) => void,
+  ): Promise<{
+    downloaded: number;
+    failed: number;
+    results: Array<{fileId: string; data: ArrayBuffer; fileName: string; mimeType: string}>;
+    errors: Array<{fileId: string; error: string}>;
+  }> {
+    const result = {
+      downloaded: 0,
+      failed: 0,
+      results: [] as Array<{fileId: string; data: ArrayBuffer; fileName: string; mimeType: string}>,
+      errors: [] as Array<{fileId: string; error: string}>,
+    };
+
+    const total = fileIds.length;
+    console.log(`[ApiClient] Starting batch download of ${total} files (batch size: ${batchSize})`);
+
+    // Process files in batches
+    for (let i = 0; i < fileIds.length; i += batchSize) {
+      const batch = fileIds.slice(i, i + batchSize);
+
+      // Download batch concurrently
+      const batchResults = await Promise.allSettled(
+        batch.map(fileId => this.downloadFile(fileId)),
+      );
+
+      // Process results
+      batchResults.forEach((batchResult, index) => {
+        const fileId = batch[index];
+        if (batchResult.status === 'fulfilled') {
+          result.downloaded++;
+          result.results.push({
+            fileId,
+            ...batchResult.value,
+          });
+        } else {
+          result.failed++;
+          result.errors.push({
+            fileId,
+            error: batchResult.reason?.message || 'Download failed',
+          });
+          console.error(`[ApiClient] Failed to download ${fileId}:`, batchResult.reason);
+        }
+
+        // Report progress
+        if (onProgress) {
+          onProgress(result.downloaded + result.failed, total, fileId);
+        }
+      });
+
+      console.log(`[ApiClient] Download batch complete: ${result.downloaded}/${total} downloaded, ${result.failed} failed`);
+    }
+
+    console.log('[ApiClient] Batch download complete:', {
+      downloaded: result.downloaded,
+      failed: result.failed,
+    });
+    return result;
   }
 
   // Generic request method for custom calls

@@ -49,7 +49,7 @@ export class SyncFormsUseCase {
   private mapApiDataToForm(data: any): Form {
     console.log('[SyncFormsUseCase] Mapping API data for form:', data.id);
     console.log('[SyncFormsUseCase] metadataSchema from API:', data.metadataSchema);
-    console.log('[SyncFormsUseCase] metadata_schema from API:', data.metadata_schema);
+    console.log('[SyncFormsUseCase] sections from API:', data.sections);
 
     return {
       id: data.id,
@@ -59,6 +59,7 @@ export class SyncFormsUseCase {
       siteType: data.siteType || data.site_type || 'GREENFIELD',
       version: data.version || 1,
       metadataSchema: data.metadataSchema || data.metadata_schema || null,
+      sections: data.sections || null,
       steps: (data.steps || []).map((step: any) => ({
         id: step.id,
         stepNumber: step.stepNumber,

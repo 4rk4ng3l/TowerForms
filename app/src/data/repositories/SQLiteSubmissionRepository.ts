@@ -148,9 +148,10 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
     if (existing.rows.length > 0) {
       // Update existing answer
       await db.executeSql(
-        'UPDATE answers SET value = ? WHERE submission_id = ? AND question_id = ?',
+        'UPDATE answers SET value = ?, comment = ? WHERE submission_id = ? AND question_id = ?',
         [
           JSON.stringify(answer.value),
+          answer.comment || null,
           submissionId,
           answer.questionId,
         ],
@@ -158,12 +159,13 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
     } else {
       // Insert new answer
       await db.executeSql(
-        'INSERT INTO answers (id, submission_id, question_id, value) VALUES (?, ?, ?, ?)',
+        'INSERT INTO answers (id, submission_id, question_id, value, comment) VALUES (?, ?, ?, ?, ?)',
         [
           generateUUID(), // Generate UUID for answer ID
           submissionId,
           answer.questionId,
           JSON.stringify(answer.value),
+          answer.comment || null,
         ],
       );
     }
@@ -263,12 +265,13 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
     answer: Answer,
   ): Promise<void> {
     await tx.executeSql(
-      'INSERT INTO answers (id, submission_id, question_id, value) VALUES (?, ?, ?, ?)',
+      'INSERT INTO answers (id, submission_id, question_id, value, comment) VALUES (?, ?, ?, ?, ?)',
       [
         generateUUID(), // Generate UUID for answer ID
         submissionId,
         answer.questionId,
         JSON.stringify(answer.value),
+        answer.comment || null,
       ],
     );
   }
@@ -284,6 +287,7 @@ export class SQLiteSubmissionRepository implements ISubmissionRepository {
     return result.rows._array.map(row => ({
       questionId: row.question_id,
       value: JSON.parse(row.value),
+      comment: row.comment || null,
       fileIds: row.file_ids ? JSON.parse(row.file_ids) : undefined,
     }));
   }

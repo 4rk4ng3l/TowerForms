@@ -33,6 +33,10 @@ export class Database {
 
       console.log('[Database] Database opened successfully');
 
+      // Enable foreign keys for CASCADE delete support
+      await this.db.execAsync('PRAGMA foreign_keys = ON;');
+      console.log('[Database] Foreign keys enabled');
+
       // Run migrations
       await runMigrations(this.db);
 
@@ -109,10 +113,15 @@ export class Database {
     console.log('[Database] Dropping all tables...');
     const db = await this.getConnection();
 
+
     // Get all table names
-    const tables = await db.getAllAsync(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-    );
+  const tables = await db.getAllAsync<{name: string}>(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+  );
+    // Get all table names
+    // const tables = await db.getAllAsync(
+    //   "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    // );
 
     // Drop each table
     for (const table of tables) {

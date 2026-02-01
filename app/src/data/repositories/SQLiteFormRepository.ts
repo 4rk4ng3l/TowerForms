@@ -41,8 +41,8 @@ export class SQLiteFormRepository implements IFormRepository {
     await this.db.transaction(async tx => {
       // Insert or replace form
       const formSql = `
-        INSERT OR REPLACE INTO forms (id, name, description, site_id, site_type, version, metadata_schema, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT OR REPLACE INTO forms (id, name, description, site_id, site_type, version, metadata_schema, sections, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       await tx.executeSql(formSql, [
@@ -53,6 +53,7 @@ export class SQLiteFormRepository implements IFormRepository {
         form.siteType,
         form.version,
         form.metadataSchema ? JSON.stringify(form.metadataSchema) : null,
+        form.sections ? JSON.stringify(form.sections) : null,
         form.createdAt.toISOString(),
         form.updatedAt.toISOString(),
       ]);
@@ -181,6 +182,7 @@ export class SQLiteFormRepository implements IFormRepository {
   private mapRowToForm(row: any, steps: FormStep[]): Form {
     console.log(`[SQLiteFormRepository] Mapping row to form ${row.id}:`, {
       metadata_schema: row.metadata_schema,
+      sections: row.sections,
       site_id: row.site_id,
       site_type: row.site_type
     });
@@ -193,6 +195,7 @@ export class SQLiteFormRepository implements IFormRepository {
       siteType: (row.site_type as SiteType) || 'GREENFIELD',
       version: row.version,
       metadataSchema: row.metadata_schema ? JSON.parse(row.metadata_schema) : null,
+      sections: row.sections ? JSON.parse(row.sections) : null,
       steps,
       createdAt: new Date(row.created_at),
       updatedAt: new Date(row.updated_at),

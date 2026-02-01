@@ -16,7 +16,7 @@ import { API_CONFIG } from '@/app/src/data/api/config';
 import { Form } from '@/app/src/core/entities/Form';
 
 export default function DownloadsScreen() {
-  const { completedSubmissions, loadCompletedSubmissions, syncSubmissions, fetchRemoteSubmissions, isLoading, isSyncing } = useSubmissionsStore();
+  const { completedSubmissions, loadCompletedSubmissions, syncSubmissions, fetchRemoteSubmissions, isLoading, isSyncing, syncProgress } = useSubmissionsStore();
   const { forms } = useFormsStore();
   const [refreshing, setRefreshing] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -64,19 +64,26 @@ export default function DownloadsScreen() {
 
                 console.log('[Downloads] Sync result:', result);
 
-                if (result.failedCount > 0) {
+                const hasErrors = result.failedCount > 0 || result.filesFailed > 0;
+
+                if (hasErrors) {
                   const errorDetails = result.errors && result.errors.length > 0
                     ? `\n\nErrores:\n${result.errors.map((e: any) => `- ${e.error || e.message || 'Unknown error'}`).join('\n')}`
                     : '';
 
                   Alert.alert(
                     'Sincronización Parcial',
-                    `Sincronizados: ${result.syncedCount}\nFallidos: ${result.failedCount}${errorDetails}\n\nVerifica tu conexión e intenta nuevamente.`
+                    `Formularios: ${result.syncedCount} sincronizados, ${result.failedCount} fallidos\n` +
+                    `Archivos: ${result.filesUploaded} subidos, ${result.filesFailed} fallidos${errorDetails}\n\n` +
+                    `Verifica tu conexión e intenta nuevamente.`
                   );
                 } else {
+                  const filesMsg = result.filesUploaded > 0
+                    ? `\n${result.filesUploaded} archivo(s) subido(s)`
+                    : '';
                   Alert.alert(
                     'Sincronización Completa',
-                    `Se sincronizaron ${result.syncedCount} formulario(s) exitosamente`
+                    `Se sincronizaron ${result.syncedCount} formulario(s) exitosamente${filesMsg}`
                   );
                 }
               } catch (error: any) {
@@ -389,6 +396,37 @@ export default function DownloadsScreen() {
             </ThemedText>
           </TouchableOpacity>
         </View>
+
+        {/* Sync Progress Indicator */}
+        {isSyncing && syncProgress.phase !== 'idle' && (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressHeader}>
+              <ThemedText style={styles.progressPhase}>
+                {syncProgress.phase === 'submissions' ? 'Sincronizando formularios...' : 'Subiendo archivos...'}
+              </ThemedText>
+              <ThemedText style={styles.progressCount}>
+                {syncProgress.current} / {syncProgress.total}
+              </ThemedText>
+            </View>
+            <View style={styles.progressBarBackground}>
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: syncProgress.total > 0
+                      ? `${(syncProgress.current / syncProgress.total) * 100}%`
+                      : '0%',
+                  },
+                ]}
+              />
+            </View>
+            {syncProgress.currentItem && (
+              <ThemedText style={styles.progressCurrentItem} numberOfLines={1}>
+                {syncProgress.phase === 'files' ? syncProgress.currentItem : `ID: ${syncProgress.currentItem.slice(0, 8)}...`}
+              </ThemedText>
+            )}
+          </View>
+        )}
       </ThemedView>
 
       {/* Statistics */}
@@ -494,7 +532,7 @@ export default function DownloadsScreen() {
                     </ThemedView>
                   )}
 
-                  {submission.metadata.completedAt && (
+                  {submission.metadata?.completedAt && (
                     <ThemedView style={styles.detailRow}>
                       <Ionicons
                         name="time-outline"
@@ -737,5 +775,43 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: '#fff',
+  },
+  progressContainer: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    borderRadius: 12,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressPhase: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  progressCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  progressBarBackground: {
+    height: 8,
+    backgroundColor: 'rgba(0, 122, 255, 0.2)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#007AFF',
+    borderRadius: 4,
+  },
+  progressCurrentItem: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 6,
   },
 });
